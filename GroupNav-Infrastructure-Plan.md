@@ -162,20 +162,21 @@ Redis and Aurora need no endpoint — they're reached over plain TCP inside the 
 
 ## 8. Summary Checklist
 
-- [ ] VPC with Public / Private-egress / Isolated subnets
-- [ ] Cognito User Pool + Identity Pool
-- [ ] Location Service Map + Geofence, scoped IAM policy
-- [ ] `ComputeSG` / `DataSG` defined and enforced
-- [ ] Cross-stack refs via `Fn::GetStackOutput`, not raw construct passing
-- [ ] Redis in Isolated subnet
-- [ ] Aurora Serverless v2 + PostGIS, `MinCapacity: 0`, auto-pause 300s, no RDS Proxy
-- [ ] Secrets Manager for DB credentials
-- [ ] IoT Core policy scoped per-identity
-- [ ] Lambda in Private-egress subnet, per-invocation DB connections
-- [ ] IoT Topic Rule with DLQ error action
-- [ ] No NAT Gateway — Interface Endpoints for `iot.data`, `logs`, `secretsmanager`; Gateway Endpoint for S3
-- [ ] GitHub OIDC, scoped CI deploy role
-- [ ] PR-time `cdk diff`, main-branch `cdk deploy`
-- [ ] `client-config.json` artifact for Flutter team
-- [ ] CloudWatch Dashboard + alarms
+- [x] VPC with Public / Private-egress / Isolated subnets
+- [x] Cognito User Pool + Identity Pool
+- [x] Location Service Map + Geofence, scoped IAM policy
+- [x] `ComputeSG` / `DataSG` defined and enforced
+- [x] Cross-stack refs via `Fn::GetStackOutput`, not raw construct passing
+- [x] Redis in Isolated subnet
+- [x] Aurora Serverless v2 + PostGIS, `MinCapacity: 0`, auto-pause 300s, no RDS Proxy
+- [x] Secrets Manager for DB credentials
+- [x] IoT Core policy scoped per-identity
+- [x] Lambda in Private-egress subnet, per-invocation DB connections
+- [x] IoT Topic Rule with DLQ error action
+- [x] No NAT Gateway — Interface Endpoints for `iot.data`, `logs`, `secretsmanager`; Gateway Endpoint for S3
+- [x] AWS-Native CI/CD: AWS CodePipeline, CodeBuild, S3, CodeStar Connection
+- [x] Automated build, test, and deploy pipeline
+- [x] `client-config.json` artifact for Flutter team
+- [x] CloudWatch Dashboard + alarms
 - [ ] Wider/disabled Aurora auto-pause window set before the actual demo
+

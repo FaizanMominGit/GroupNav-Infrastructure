@@ -1,0 +1,34 @@
+{
+  "region": "ap-south-1",
+  "cognito": {
+    "userPoolId": "ap-south-1_JoK8Zlj1x",
+    "userPoolClientId": "4ko1153kp0hl7q7oa402cqiqfi",
+    "identityPoolId": "ap-south-1:0efa5668-5ed9-4ee6-9120-86f8cc2ae4cd"
+  },
+  "location": {
+    "mapName": "GroupNavMap",
+    "mapArn": "arn:aws:geo:ap-south-1:325313611329:map/GroupNavMap",
+    "geofenceCollectionName": "GroupNavGeofenceCollection",
+    "geofenceCollectionArn": "arn:aws:geo:ap-south-1:325313611329:geofence-collection/GroupNavGeofenceCollection"
+  },
+  "iot": {
+    "endpoint": "a362o0ub4ypzaj-ats.iot.ap-south-1.amazonaws.com"
+  },
+  "network": {
+    "vpcId": "vpc-00344461b667c775b",
+    "computeSecurityGroupId": "sg-0652edc6f66a106c3",
+    "dataSecurityGroupId": "sg-0919354b60c52b091",
+    "publicSubnetIds": [
+      "subnet-05819044160ff84a6",
+      "subnet-0a7aaec6dd9c4280b"
+    ],
+    "privateComputeSubnetIds": [
+      "subnet-09da142a33f841e76",
+      "subnet-0577e6ba5a6d03c15"
+    ],
+    "isolatedDataSubnetIds": [
+      "subnet-0b40b6140d28643f6",
+      "subnet-078da58d5e8a48ef9"
+    ]
+  }
+}

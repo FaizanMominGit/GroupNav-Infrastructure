@@ -4,6 +4,7 @@ import { NetworkStack } from '../lib/network-stack';
 import { AuthStack } from '../lib/auth-stack';
 import { DataStack } from '../lib/data-stack';
 import { ComputeStack } from '../lib/compute-stack';
+import { PipelineStack } from '../lib/pipeline-stack';
 
 const app = new cdk.App();
 
@@ -31,3 +32,11 @@ new ComputeStack(app, 'ComputeStack', {
   env,
   description: 'GroupNav Phase 3: Ingestion & Compute (IoT Core Topic Rule, Lambda, SQS DLQ, VPC Endpoints)',
 });
+
+new PipelineStack(app, 'PipelineStack', {
+  env,
+  description: 'GroupNav Phase 4: CI/CD Pipeline (GitHub OIDC & Deploy Role)',
+  githubOwner: 'FaizanMominGit',
+  githubRepo: 'GroupNav-Infrastructure',
+});
+

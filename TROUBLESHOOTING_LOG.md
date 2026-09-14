@@ -120,3 +120,75 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 - **Prevention Rule**:
   When introducing CDK into existing repositories with documentation or config files, use a temporary initialization directory or directly scaffold official CDK configuration files.
 
+---
+
+### [ISSUE-006] AWS CLI Location Service Output Missing (Requires --outfile)
+- **Date & Phase**: 2026-09-14 | Phase 1 Integration
+- **Component / Command**: AWS CLI (`aws location ...`)
+- **Symptom / Error Message**:
+  When calling certain AWS Location Service APIs via the AWS CLI (e.g., getting map tiles), the command fails or hangs because the CLI expects to write binary data to a file but defaults to standard output, which causes formatting errors.
+- **Root Cause Analysis**:
+  Unlike most AWS APIs that return JSON, Location Service tile data and similar binary payloads require an explicitly designated output stream in the CLI.
+- **Fix / Solution Applied**:
+  Pass the `--outfile <filename>` parameter to the AWS CLI command when requesting non-JSON payloads.
+- **Verification**:
+  Successful retrieval of the map tile when saving to a `.png` file.
+- **Prevention Rule**:
+  Always review the specific payload format of an AWS API; if it is binary/image data, append `--outfile` when testing via CLI.
+
+---
+
+### [ISSUE-007] GitHub Secret Scanner Triggered by Ephemeral STS Access Key in Docs
+- **Date & Phase**: 2026-09-14 | Phase 1 Documentation Review
+- **Component / Command**: Git commit `be0d430` / `docs/STEP_4_HOW_AND_WHY.md` / `scripts/verify-phase1.ts`
+- **Symptom / Error Message**:
+  GitHub Secret Scanning alert triggered on public repository:
+  `Amazon AWS Temporary Access Key ID #1 detected in docs/STEP_4_HOW_AND_WHY.md (ASIAUXPRTYZAVTLVLWWW)`
+- **Root Cause Analysis**:
+  During the Step 4 automated verification run, `scripts/verify-phase1.ts` printed the raw `AccessKeyId` returned by Cognito STS (`ASIA...`) to stdout. The verification console output was copied verbatim into `docs/STEP_4_HOW_AND_WHY.md`. Although the token was a short-lived temporary token that was already expired and tied to a deleted test user, GitHub secret scanners match any AWS key signature (including `ASIA...`). Furthermore, including verbatim credentials violates the "Explain, Do Not Dump Code/Raw Secrets" documentation rule.
+- **Fix / Solution Applied**:
+  1. Masked the output in `scripts/verify-phase1.ts` using `creds.AccessKeyId.substring(0, 4) + '****************'`.
+  2. Masked the token in `docs/STEP_4_HOW_AND_WHY.md`.
+  3. Amended commit `be0d430` to `56cd867` and force-pushed to completely eliminate the secret string from GitHub commit history.
+- **Verification**:
+  Grep confirmed zero unmasked `ASIA...` active tokens in the workspace. Commit amended and pushed cleanly.
+- **Prevention Rule**:
+  Never log unmasked credentials in verification scripts or documentation. All tokens, secrets, ARNs with sensitive IDs, and access keys must be masked prior to console output or inclusion in `.md` reports.
+
+---
+
+### [ISSUE-008] ElastiCache Replication Group Rollback: Automatic Failover with 1 Cache Cluster
+- **Date & Phase**: 2026-09-14 | Phase 2 (DataStack Deployment)
+- **Component / Command**: `npx cdk deploy DataStack` / `AWS::ElastiCache::ReplicationGroup`
+- **Symptom / Error Message**:
+  ```
+  When using automatic failover, there must be at least 2 cache clusters in the replication group. (Service: ElastiCache, Status Code: 400)
+  ```
+- **Root Cause Analysis**:
+  In AWS CloudFormation, `AWS::ElastiCache::ReplicationGroup` defaults `AutomaticFailoverEnabled` to true or enforces multi-node topology if automatic failover is not explicitly disabled. For a single-node cost-saving dev/hackathon cluster (`numCacheClusters: 1`), automatic failover cannot function and the CloudFormation provider fails creation.
+- **Fix / Solution Applied**:
+  Explicitly set `automaticFailoverEnabled: false` on the `CfnReplicationGroup` construct in `lib/data-stack.ts`. Deleted the `ROLLBACK_COMPLETE` stack to clear CloudFormation state.
+- **Verification**:
+  Unit test updated to assert `AutomaticFailoverEnabled: false`. `npx jest test/data-stack.test.ts` passed.
+- **Prevention Rule**:
+  Whenever specifying `numCacheClusters: 1` or single-node topology on `CfnReplicationGroup`, always explicitly declare `automaticFailoverEnabled: false`.
+
+---
+
+### [ISSUE-009] Aurora PostgreSQL Version 16.3 Not Available in ap-south-1 (Resolved with 16.8)
+- **Date & Phase**: 2026-09-14 | Phase 2 (DataStack Deployment)
+- **Component / Command**: `npx cdk deploy DataStack` / `AWS::RDS::DBCluster`
+- **Symptom / Error Message**:
+  ```
+  Cannot find version 16.3 for aurora-postgresql (Service: Rds, Status Code: 400)
+  ```
+- **Root Cause Analysis**:
+  In AWS region `ap-south-1` (Mumbai), older point releases of major versions (like 16.3) are superseded and phased out by AWS RDS as newer patch versions are released. Querying `aws rds describe-db-engine-versions` revealed the active 16.x versions start at `16.8` up to `16.14`.
+- **Fix / Solution Applied**:
+  Updated `rds.AuroraPostgresEngineVersion` in `lib/data-stack.ts` to `VER_16_8` (which meets the plan's requirement of "16.3+ or 15.7+" and fully supports auto-pause `MinCapacity: 0`).
+- **Verification**:
+  Verified via `aws rds describe-db-engine-versions --engine aurora-postgresql` that `16.8` is available in `ap-south-1`. Unit test updated and passed.
+- **Prevention Rule**:
+  Before specifying fixed minor/patch engine versions in CloudFormation, query the active engine versions in the target region via `aws rds describe-db-engine-versions`.
+
+

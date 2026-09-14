@@ -1,0 +1,49 @@
+{
+  "region": "ap-south-1",
+  "cognito": {
+    "userPoolId": "ap-south-1_JoK8Zlj1x",
+    "userPoolClientId": "4ko1153kp0hl7q7oa402cqiqfi",
+    "identityPoolId": "ap-south-1:0efa5668-5ed9-4ee6-9120-86f8cc2ae4cd"
+  },
+  "location": {
+    "mapName": "GroupNavMap",
+    "mapArn": "arn:aws:geo:ap-south-1:325313611329:map/GroupNavMap",
+    "geofenceCollectionName": "GroupNavGeofenceCollection",
+    "geofenceCollectionArn": "arn:aws:geo:ap-south-1:325313611329:geofence-collection/GroupNavGeofenceCollection"
+  },
+  "iot": {
+    "endpoint": "a362o0ub4ypzaj-ats.iot.ap-south-1.amazonaws.com"
+  },
+  "network": {
+    "vpcId": "vpc-00344461b667c775b",
+    "computeSecurityGroupId": "sg-0652edc6f66a106c3",
+    "dataSecurityGroupId": "sg-0919354b60c52b091",
+    "publicSubnetIds": [
+      "subnet-05819044160ff84a6",
+      "subnet-0a7aaec6dd9c4280b"
+    ],
+    "privateComputeSubnetIds": [
+      "subnet-09da142a33f841e76",
+      "subnet-0577e6ba5a6d03c15"
+    ],
+    "isolatedDataSubnetIds": [
+      "subnet-0b40b6140d28643f6",
+      "subnet-078da58d5e8a48ef9"
+    ]
+  },
+  "data": {
+    "redisEndpoint": "darxx9kygkawaf7.gtzybr.ng.0001.aps1.cache.amazonaws.com:6379",
+    "auroraClusterEndpoint": "datastack-auroracluster23d869c0-bojcqvtjqceq.cluster-clisq44gok7m.ap-south-1.rds.amazonaws.com"
+  },
+  "compute": {
+    "lambdaArn": "arn:aws:lambda:ap-south-1:325313611329:function:groupnav-process-telemetry",
+    "dlqUrl": "https://sqs.ap-south-1.amazonaws.com/325313611329/groupnav-telemetry-dlq",
+    "telemetryTopicPattern": "groupnav/{riderId}/telemetry"
+  },
+  "cicd": {
+    "pipelineName": "GroupNav-Infrastructure-Pipeline",
+    "pipelineArn": "arn:aws:codepipeline:ap-south-1:325313611329:GroupNav-Infrastructure-Pipeline",
+    "gitHubConnectionArn": "arn:aws:codestar-connections:ap-south-1:325313611329:connection/d8157624-26c4-4b54-b689-3bc221f82a96",
+    "artifactBucketName": "groupnav-pipeline-artifacts-325313611329-ap-south-1"
+  }
+}

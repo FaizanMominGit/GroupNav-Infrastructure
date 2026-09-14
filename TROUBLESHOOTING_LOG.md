@@ -208,5 +208,44 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 - **Prevention Rule**:
   Target the latest active LTS runtime supported by AWS Lambda (`NODEJS_22_X`) when initializing new serverless functions.
 
+---
+
+### [ISSUE-011] Flutter SDK Not Found in Windows Environment (Resolved: Installed Flutter 3.47.4)
+- **Date & Phase**: 2026-09-14 | UI Phase 1 (Client Scaffolding)
+- **Component / Command**: Environment verification (`flutter --version`)
+- **Symptom / Error Message**:
+  ```
+  INFO: Could not find files for the given pattern(s).
+  flutter : The term 'flutter' is not recognized as the name of a cmdlet...
+  ```
+- **Root Cause Analysis**:
+  Flutter SDK was not installed on the system. Cross-platform mobile development requires the Flutter CLI framework and Dart runtime.
+- **Fix / Solution Applied**:
+  Cloned official Flutter stable branch (`--depth 1`) from `https://github.com/flutter/flutter.git` into `D:\flutter`. Initialized Dart SDK artifacts and persisted `D:\flutter\bin` to the Windows User environment `Path` registry.
+- **Verification**:
+  `flutter --version` verified working (Flutter 3.47.4, Dart 3.13.3, DevTools 2.60.0).
+- **Prevention Rule**:
+  Install mobile SDKs to dedicated secondary drives with sufficient disk space and register binary paths directly in the User environment registry.
+
+---
+
+### [ISSUE-012] Flutter 3.47 Theme & Deprecation Changes (CardThemeData & withValues)
+- **Date & Phase**: 2026-09-14 | UI Phase 1 (Design System Implementation)
+- **Component / Command**: `flutter analyze`
+- **Symptom / Error Message**:
+  ```
+  error - The argument type 'CardTheme' can't be assigned to the parameter type 'CardThemeData?' - lib\core\theme\app_theme.dart:83:18
+  info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\core\widgets\bottom_nav_bar.dart:24:33
+  ```
+- **Root Cause Analysis**:
+  In modern Flutter (3.47 / Dart 3.13), `ThemeData.cardTheme` strictly requires `CardThemeData` instead of `CardTheme` (which is a widget). Furthermore, `Color.withOpacity()` was deprecated across Flutter framework in favor of `Color.withValues(alpha: ...)`.
+- **Fix / Solution Applied**:
+  Updated `app_theme.dart` to specify `cardTheme: CardThemeData(...)`. Replaced all occurrences of `withOpacity(...)` with `withValues(alpha: ...)` across the theme and shell widgets.
+- **Verification**:
+  `flutter analyze` succeeded with `No issues found! (ran in 14.1s)`.
+- **Prevention Rule**:
+  Strictly use modern Flutter 3.47 API standards (`CardThemeData`, `withValues(alpha: ...)`) for all new UI components.
+
+
 
 

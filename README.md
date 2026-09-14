@@ -15,41 +15,41 @@ flowchart TD
     end
 
     subgraph AuthLoc ["Identity & Mapping"]
-        Cognito["Amazon Cognito\n(User Pool + Identity Pool)"]
-        LocMap["Amazon Location Service\n(GroupNavMap + Geofences)"]
+        Cognito["Amazon Cognito<br/>(User Pool + Identity Pool)"]
+        LocMap["Amazon Location Service<br/>(GroupNavMap + Geofences)"]
     end
 
     subgraph Ingestion ["Real-Time Ingestion Tier"]
-        IoTCore["AWS IoT Core\n(MQTT Topic: groupnav/{riderId}/telemetry)"]
-        TopicRule["IoT Topic Rule\n(SELECT *, topic(2) as rider_id)"]
-        DLQ["Amazon SQS DLQ\n(groupnav-telemetry-dlq)"]
+        IoTCore["AWS IoT Core<br/>(MQTT Topic: groupnav/{riderId}/telemetry)"]
+        TopicRule["IoT Topic Rule<br/>(SELECT *, topic(2) as rider_id)"]
+        DLQ["Amazon SQS DLQ<br/>(groupnav-telemetry-dlq)"]
     end
 
     subgraph Compute ["Compute Tier ($0 NAT Gateway)"]
         VPC["Amazon VPC (Multi-AZ)"]
-        Endpoints["VPC Endpoints\n(Secrets Manager, Logs, S3)"]
-        Lambda["processTelemetry Lambda\n(Node.js 22 LTS, ARM64)"]
+        Endpoints["VPC Endpoints<br/>(Secrets Manager, Logs, S3)"]
+        Lambda["processTelemetry Lambda<br/>(Node.js 22 LTS, ARM64)"]
     end
 
     subgraph Storage ["Stateful Storage Tier"]
-        Redis["Amazon ElastiCache Redis\n(GEOADD riders lon lat riderId)"]
-        Aurora["Aurora Serverless v2 (PostgreSQL 16.8)\n(PostGIS spatial geometry: ST_MakePoint)"]
+        Redis["Amazon ElastiCache Redis<br/>(GEOADD riders lon lat riderId)"]
+        Aurora["Aurora Serverless v2 PostgreSQL<br/>(PostGIS spatial geometry: ST_MakePoint)"]
     end
 
     subgraph CICDObs ["CI/CD & Observability"]
-        Pipeline["AWS CodePipeline & CodeBuild\n(Native Continuous Deployment)"]
-        Dashboard["CloudWatch Dashboard & Alarms\n(GroupNav-Operational-Dashboard)"]
+        Pipeline["AWS CodePipeline & CodeBuild<br/>(Native Continuous Deployment)"]
+        Dashboard["CloudWatch Dashboard & Alarms<br/>(GroupNav-Operational-Dashboard)"]
     end
 
-    Rider -->|1. Authenticate| Cognito
-    Rider -->|2. Fetch Map Tiles| LocMap
-    Rider -->|3. Publish GPS MQTT| IoTCore
-    IoTCore -->|Trigger| TopicRule
-    TopicRule -->|Primary Action| Lambda
-    TopicRule -->|Error Fallback| DLQ
-    Lambda -->|PrivateLink| Endpoints
-    Lambda -->|O(1) Live Spatial Cache| Redis
-    Lambda -->|Durable Spatial History| Aurora
+    Rider -->|"1. Authenticate"| Cognito
+    Rider -->|"2. Fetch Map Tiles"| LocMap
+    Rider -->|"3. Publish GPS MQTT"| IoTCore
+    IoTCore -->|"Trigger"| TopicRule
+    TopicRule -->|"Primary Action"| Lambda
+    TopicRule -->|"Error Fallback"| DLQ
+    Lambda -->|"PrivateLink"| Endpoints
+    Lambda -->|"Live Spatial Proximity Cache"| Redis
+    Lambda -->|"Durable Spatial History"| Aurora
 ```
 
 ---

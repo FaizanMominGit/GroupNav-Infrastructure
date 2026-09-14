@@ -28,7 +28,7 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 
 ## Logged Issues & Pre-emptive Findings
 
-### [ISSUE-001] AWS CLI Not Found in System PATH
+### [ISSUE-001] AWS CLI Not Found in System PATH (Resolved: Installed v2.36.44)
 - **Date & Phase**: 2026-09-14 | Phase 1 Prerequisites
 - **Component / Command**: Environment verification (`aws --version`)
 - **Symptom / Error Message**:
@@ -36,13 +36,14 @@ When an issue, error, or unexpected behavior is encountered, document it using t
   aws : The term 'aws' is not recognized as the name of a cmdlet, function, script file, or operable program.
   ```
 - **Root Cause Analysis**:
-  AWS CLI v2 is not installed or not added to the Windows environment `PATH`. Deployment and manual verification (e.g., registering test users, testing IAM auth) require AWS credentials and CLI tools.
+  AWS CLI v2 was not installed on the system. Deployment, CDK bootstrap, and manual verification require AWS CLI tools and active credentials.
 - **Fix / Solution Applied**:
-  Prompt user to install AWS CLI v2 or configure AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, or AWS profiles). Avoid creating makeshift shell wrappers.
+  Installed official AWS CLI v2 via `winget install --id Amazon.AWSCLI -e --accept-source-agreements --accept-package-agreements`. Binary located at `C:\Program Files\Amazon\AWSCLIV2\aws.exe`.
+  *Note on Active Shells*: Existing PowerShell sessions opened prior to installation do not automatically inherit updated environment PATH variables until either the terminal is restarted or `$env:Path` is refreshed from the registry.
 - **Verification**:
-  Run `aws --version` and `aws sts get-caller-identity`.
+  `aws --version` verified working (`aws-cli/2.36.44`).
 - **Prevention Rule**:
-  Always verify prerequisites before attempting deployment. If credentials/CLI are required from the user, request them directly without fake workarounds.
+  When installing CLI utilities in active Windows terminal sessions, instruct user to reload the session PATH or open a new terminal tab.
 
 ---
 

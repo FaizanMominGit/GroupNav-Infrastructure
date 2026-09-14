@@ -20,9 +20,12 @@
 ### C. Comprehensive Documentation in Workspace (.md) Files
 - For **every single step and milestone**, create a dedicated markdown file in the workspace under `docs/` (e.g. `docs/STEP_1_HOW_AND_WHY.md`).
 - Document in thorough detail:
-  1. **How It Was Done**: Step-by-step code, file changes, directory architecture, and command invocations.
+  1. **How It Was Done**: Technical mechanics, architecture, file responsibilities, and command invocations.
   2. **Why It Was Done This Way**: Architectural decisions, CDK best practices, cost controls, security rationales.
   3. **Verification Evidence**: Verifiable outputs, test runs, synthesis validations.
+- **Rule for Documentation: Explain, Do Not Dump Code**:
+  - Focus on clear, structured prose, architectural concepts, component relationships, and trade-offs.
+  - **DO NOT paste large blocks of raw source code** into documentation files. The source code already exists in `lib/` and `test/`. Keep documents readable and analytical.
 - Do NOT rely on IDE-internal walkthrough artifacts that are inaccessible outside the active session. Everything must live permanently in repository markdown files.
 - Maintain and update [TROUBLESHOOTING_LOG.md](../../TROUBLESHOOTING_LOG.md) whenever an error, bug, or architectural challenge is encountered:
   - Document the symptom and exact error.
@@ -35,3 +38,7 @@
 - Keep stacks modular and decoupled (`NetworkStack`, `AuthStack`, `DataStack`, `ComputeStack`, `PipelineStack`, `ObservabilityStack`).
 - Avoid direct construct passing that generates tight `Fn::Export` CloudFormation deadlocks.
 - Ensure cost awareness (no unneeded NAT gateways; scale-to-zero configurations where planned).
+
+### E. Git Discipline: Commit & Push Strictly Once Per Completed Step
+- **No Unnecessary Micro-Commits**: Avoid committing intermediate tweaks, temporary edits, or partial steps.
+- **Single Atomic Commit Per Step**: Commit and push strictly once per milestone when implementation, tests, and documentation are all completed and verified.

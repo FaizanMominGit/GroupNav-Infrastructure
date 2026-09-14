@@ -267,6 +267,25 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 - **Prevention Rule**:
   Always abstract platform-specific plugins (storage, sensors, biometric hardware) behind domain interfaces to allow seamless dependency injection during testing.
 
+---
+
+### [ISSUE-014] Flutter Switch activeColor Deprecation in Flutter 3.31+
+- **Date & Phase**: 2026-09-15 | UI Phase 3 (Live Radar HUD Sheet Implementation)
+- **Component / Command**: `flutter analyze`
+- **Symptom / Error Message**:
+  ```
+  info - 'activeColor' is deprecated and shouldn't be used. Use activeThumbColor instead - lib\features\radar\widgets\radar_hud_sheet.dart:174:19
+  ```
+- **Root Cause Analysis**:
+  In modern Flutter (post v3.31.0), `Switch.activeColor` was deprecated in favor of explicit `Switch.activeThumbColor` and `Switch.activeTrackColor` to clearly differentiate thumb and track styling.
+- **Fix / Solution Applied**:
+  Replaced `activeColor: AppColors.primary` with `activeThumbColor: AppColors.primary` in `RadarHudSheet`.
+- **Verification**:
+  `flutter analyze` succeeded with `No issues found! (ran in 10.4s)`.
+- **Prevention Rule**:
+  Use `activeThumbColor` when styling custom Material 3 toggle switches.
+
+
 
 
 

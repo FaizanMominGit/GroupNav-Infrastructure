@@ -7,6 +7,7 @@ import '../../core/widgets/bottom_nav_bar.dart';
 import '../../core/widgets/top_app_bar_pill.dart';
 import '../auth/providers/auth_provider.dart';
 import '../auth/screens/auth_onboarding_screen.dart';
+import '../radar/screens/live_radar_screen.dart';
 
 class MainShellScreen extends ConsumerStatefulWidget {
   final ClientConfig config;
@@ -33,16 +34,18 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: TopAppBarPill(
-        title: 'GroupNav',
-        subtitle: pilot.callsign,
-        rewardRate: 4.2,
-      ),
+      appBar: _currentTabIndex == 1
+          ? null
+          : TopAppBarPill(
+              title: 'GroupNav',
+              subtitle: pilot.callsign,
+              rewardRate: 4.2,
+            ),
       body: IndexedStack(
         index: _currentTabIndex,
         children: [
           _buildPlaceholderScreen('Pack Management', 'Active formation #804 & geofence setup', Icons.navigation),
-          _buildRadarScreen(pilot.callsign, pilot.vehicleClass),
+          const LiveRadarScreen(),
           _buildPlaceholderScreen('Trip History', 'Aurora PostgreSQL PostGIS replay ledger', Icons.history),
           _buildSettingsScreen(pilot.callsign, pilot.vehicleClass, pilot.cognitoIdentityId),
         ],
@@ -58,48 +61,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     );
   }
 
-  Widget _buildRadarScreen(String callsign, String vehicleClass) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.primaryFixed.withValues(alpha: 0.3),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.radar, size: 54, color: AppColors.primary),
-            ),
-            const SizedBox(height: 20),
-            Text('Leader: $callsign', style: AppTypography.headlineLg),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'Class: ${vehicleClass.toUpperCase()}',
-                style: AppTypography.labelSm.copyWith(color: AppColors.primaryDark),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Connected to AWS Region: ${widget.config.region}\n'
-              'Map Resource: ${widget.config.location.mapName}\n'
-              'IoT Endpoint: ${widget.config.iot.endpoint}',
-              textAlign: TextAlign.center,
-              style: AppTypography.bodyMd.copyWith(color: AppColors.textSecondary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _buildSettingsScreen(String callsign, String vehicleClass, String? identityId) {
     return Padding(

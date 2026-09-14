@@ -191,4 +191,22 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 - **Prevention Rule**:
   Before specifying fixed minor/patch engine versions in CloudFormation, query the active engine versions in the target region via `aws rds describe-db-engine-versions`.
 
+---
+
+### [ISSUE-010] AWS Lambda Node.js 20 Deprecation in CDK Construct
+- **Date & Phase**: 2026-09-14 | Phase 3 (ComputeStack Implementation)
+- **Component / Command**: `NodejsFunction` in `lib/compute-stack.ts`
+- **Symptom / Error Message**:
+  Deprecation warning / potential synthesis rejection when specifying `Runtime.NODEJS_20_X`:
+  `Runtime NODEJS_20_X is deprecated by AWS Lambda / CDK in favor of active LTS versions.`
+- **Root Cause Analysis**:
+  AWS Lambda and modern CDK v2 releases deprecate older Node.js runtimes as they approach EOL or as newer LTS versions (Node.js 22 LTS) are standardized across the platform.
+- **Fix / Solution Applied**:
+  Specified `runtime: lambda.Runtime.NODEJS_22_X` on the `processTelemetry` `NodejsFunction` construct.
+- **Verification**:
+  Synthesized and tested cleanly across all unit tests and successfully executed live in `ap-south-1`.
+- **Prevention Rule**:
+  Target the latest active LTS runtime supported by AWS Lambda (`NODEJS_22_X`) when initializing new serverless functions.
+
+
 

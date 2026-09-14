@@ -12,13 +12,24 @@
     "@swc/jest": "^0.2.39",
     "@types/jest": "^30",
     "@types/node": "^24.10.1",
-    "jest": "^30",
+    "@types/pg": "^8.23.1",
     "aws-cdk": "2.1141.0",
+    "esbuild": "^0.28.2",
+    "jest": "^30",
     "tsx": "^4.23.0",
     "typescript": "~7.0.2"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudformation": "^3.1131.0",
+    "@aws-sdk/client-cognito-identity": "^3.1131.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1131.0",
+    "@aws-sdk/client-iot-data-plane": "^3.1131.0",
+    "@aws-sdk/client-secrets-manager": "^3.1131.0",
+    "@aws-sdk/client-sqs": "^3.1131.0",
     "aws-cdk-lib": "^2.268.0",
-    "constructs": "^10.5.0"
+    "constructs": "^10.5.0",
+    "mqtt": "^5.15.2",
+    "pg": "^8.23.0",
+    "redis": "^6.2.1"
   }
 }

@@ -30,5 +30,14 @@
       "subnet-0b40b6140d28643f6",
       "subnet-078da58d5e8a48ef9"
     ]
+  },
+  "data": {
+    "redisEndpoint": "darxx9kygkawaf7.gtzybr.ng.0001.aps1.cache.amazonaws.com:6379",
+    "auroraClusterEndpoint": "datastack-auroracluster23d869c0-bojcqvtjqceq.cluster-clisq44gok7m.ap-south-1.rds.amazonaws.com"
+  },
+  "compute": {
+    "lambdaArn": "arn:aws:lambda:ap-south-1:325313611329:function:groupnav-process-telemetry",
+    "dlqUrl": "https://sqs.ap-south-1.amazonaws.com/325313611329/groupnav-telemetry-dlq",
+    "telemetryTopicPattern": "groupnav/{riderId}/telemetry"
   }
 }

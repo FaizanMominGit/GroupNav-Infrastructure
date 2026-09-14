@@ -5,6 +5,7 @@ import { AuthStack } from '../lib/auth-stack';
 import { DataStack } from '../lib/data-stack';
 import { ComputeStack } from '../lib/compute-stack';
 import { PipelineStack } from '../lib/pipeline-stack';
+import { ObservabilityStack } from '../lib/observability-stack';
 
 const app = new cdk.App();
 
@@ -35,8 +36,14 @@ new ComputeStack(app, 'ComputeStack', {
 
 new PipelineStack(app, 'PipelineStack', {
   env,
-  description: 'GroupNav Phase 4: CI/CD Pipeline (GitHub OIDC & Deploy Role)',
+  description: 'GroupNav Phase 4: CI/CD Pipeline (AWS CodePipeline, CodeBuild, S3, CodeStar & OIDC)',
   githubOwner: 'FaizanMominGit',
   githubRepo: 'GroupNav-Infrastructure',
 });
+
+new ObservabilityStack(app, 'ObservabilityStack', {
+  env,
+  description: 'GroupNav Phase 5: Observability & Guardrails (CloudWatch Dashboard, Alarms, IoT Logging)',
+});
+
 

@@ -246,6 +246,28 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 - **Prevention Rule**:
   Strictly use modern Flutter 3.47 API standards (`CardThemeData`, `withValues(alpha: ...)`) for all new UI components.
 
+---
+
+### [ISSUE-013] FlutterSecureStorage Platform Channel Exception in Headless Unit Tests
+- **Date & Phase**: 2026-09-15 | UI Phase 2 (Cognito Auth Service Testing)
+- **Component / Command**: `flutter test test/auth_test.dart`
+- **Symptom / Error Message**:
+  ```
+  Binding has not yet been initialized.
+  The "instance" getter on the ServicesBinding binding mixin is only available once that binding has been initialized.
+  MethodChannel.invokeMethod -> MethodChannelFlutterSecureStorage.read
+  ```
+- **Root Cause Analysis**:
+  `FlutterSecureStorage` relies on native platform channels (`MethodChannel`). In pure headless unit tests where no native Android/iOS/Windows engine runner is bootstrapped, invoking platform methods throws a binding initialization error.
+- **Fix / Solution Applied**:
+  1. Initialized `TestWidgetsFlutterBinding.ensureInitialized()` in test entry points.
+  2. Applied the Dependency Inversion Principle: introduced the `AuthStorage` interface in `cognito_auth_service.dart` with `SecureAuthStorage` (wrapping `FlutterSecureStorage` for production) and `MemoryAuthStorage` (an in-memory key-value map for headless unit tests).
+- **Verification**:
+  `flutter test` passed all 6 unit tests without platform channel exceptions.
+- **Prevention Rule**:
+  Always abstract platform-specific plugins (storage, sensors, biometric hardware) behind domain interfaces to allow seamless dependency injection during testing.
+
+
 
 
 

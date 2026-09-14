@@ -4,6 +4,8 @@ import 'core/config/client_config.dart';
 import 'core/theme/app_theme.dart';
 import 'features/shell/main_shell_screen.dart';
 
+import 'features/auth/providers/auth_provider.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -12,6 +14,9 @@ void main() async {
 
   runApp(
     ProviderScope(
+      overrides: [
+        clientConfigProvider.overrideWithValue(config),
+      ],
       child: GroupNavApp(config: config),
     ),
   );

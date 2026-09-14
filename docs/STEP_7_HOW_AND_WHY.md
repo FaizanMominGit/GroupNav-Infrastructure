@@ -17,30 +17,26 @@ In this step, we built `PipelineStack` (`lib/pipeline-stack.ts`) providing a ful
   - Two-stage continuous deployment pipeline entirely hosted and orchestrated inside AWS:
     1. **Source Stage**: Listens for changes on branch `master` via AWS CodeStar Connection.
     2. **TestAndDeploy Stage**: Invokes AWS CodeBuild to run tests, deploy stacks, and publish `client-config.json` artifact.
-- **Dual Support: IAM OpenID Connect (OIDC) & GitHub Actions**:
-  - Configured AWS IAM OIDC provider (`token.actions.githubusercontent.com`) and scoped deploy role (`GroupNav-GitHubActionsDeployRole`) restricted strictly to `repo:FaizanMominGit/GroupNav-Infrastructure:*`.
-  - Allows seamless execution from GitHub Actions (`.github/workflows/deploy.yml`) as well as native AWS CodePipeline.
 - **Automated Client Configuration Exporter (`scripts/export-client-config.ts`)**:
   - Dynamically discovers active CloudFormation stack outputs (`NetworkStack`, `AuthStack`, `DataStack`, `ComputeStack`, `PipelineStack`).
   - Queries AWS IoT Core ATS endpoint via `@aws-sdk/client-iot` `DescribeEndpointCommand`.
   - Writes directly to `client-config.json` without manual copy-pasting.
 
 ## 2. Why It Was Done This Way
-- **AWS-Native Operational Control**: Deploying with AWS CodePipeline and CodeBuild ensures that all build logs, artifacts, and deployment executions reside securely within AWS IAM and CloudWatch boundaries.
-- **Zero Static Secrets**: Both AWS CodePipeline (via IAM service roles) and GitHub Actions (via IAM OIDC federation) completely eliminate long-lived AWS access keys.
-- **Least-Privilege Bootstrap Delegation**: Neither CodeBuild nor GitHub Actions requires `AdministratorAccess`. Both assume the segregated CDK bootstrap roles with scoped trust.
+- **AWS-Native Operational Control**: Deploying exclusively with AWS CodePipeline and CodeBuild ensures that all build logs, artifacts, and deployment executions reside securely within AWS IAM and CloudWatch boundaries.
+- **Zero Static Secrets**: AWS CodePipeline and CodeBuild authenticate via IAM service roles, completely eliminating long-lived AWS access keys.
+- **Least-Privilege Bootstrap Delegation**: CodeBuild does not require `AdministratorAccess`. It assumes the segregated CDK bootstrap roles with scoped trust.
 - **Deterministic Configuration Artifacts**: Storing `client-config.json` in the versioned S3 artifact bucket and exporting it via CLI ensures the mobile/client team always consumes consistent, valid backend coordinates.
 
 ## 3. Verification Evidence
 
 ### 3.1 Automated Synthesis & Unit Testing
 - Synthesized cleanly via `npx cdk synth PipelineStack`.
-- Complete test suite passed (**30/30 tests passing across all 5 stacks**):
+- Complete test suite passed (**29/29 tests passing across all 5 stacks**):
   - Verified AWS CodeStar Connection configuration for GitHub.
   - Verified S3 Artifact Bucket encryption, SSL enforcement, and public access blocks.
   - Verified CodeBuild project environment, buildspec commands, and scoped IAM policies.
   - Verified AWS CodePipeline multi-stage definition (`Source` and `TestAndDeploy`).
-  - Verified GitHub OIDC Provider and scoped Deploy Role.
   - Verified CloudFormation outputs for Pipeline Name, Connection ARN, and Artifact Bucket.
 
 ### 3.2 Dynamic Config Export Verification
@@ -53,6 +49,6 @@ In this step, we built `PipelineStack` (`lib/pipeline-stack.ts`) providing a ful
 - **AWS CodePipeline ARN**: `arn:aws:codepipeline:ap-south-1:325313611329:GroupNav-Infrastructure-Pipeline`
 - **AWS CodeStar Connection ARN**: `arn:aws:codestar-connections:ap-south-1:325313611329:connection/d8157624-26c4-4b54-b689-3bc221f82a96`
 - **S3 Pipeline Artifact Bucket**: `groupnav-pipeline-artifacts-325313611329-ap-south-1`
-- **GitHub Actions Deploy Role ARN**: `arn:aws:iam::325313611329:role/GroupNav-GitHubActionsDeployRole`
+
 
 

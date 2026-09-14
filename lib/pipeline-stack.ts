@@ -17,8 +17,6 @@ export class PipelineStack extends cdk.Stack {
   public readonly artifactBucket: s3.IBucket;
   public readonly buildProject: codebuild.PipelineProject;
   public readonly gitHubConnection: codestarconnections.CfnConnection;
-  public readonly deployRole: iam.Role;
-  public readonly oidcProvider: iam.IOpenIdConnectProvider;
 
   constructor(scope: Construct, id: string, props: PipelineStackProps) {
     super(scope, id, props);
@@ -157,60 +155,7 @@ export class PipelineStack extends cdk.Stack {
     });
 
     // =========================================================================
-    // 5. GitHub Actions OIDC Provider & Deploy Role (Federated Dual Support)
-    // =========================================================================
-    this.oidcProvider = new iam.OpenIdConnectProvider(this, 'GitHubOIDCProvider', {
-      url: 'https://token.actions.githubusercontent.com',
-      clientIds: ['sts.amazonaws.com'],
-      thumbprints: [
-        '6938fd4d98bab03faadb97b34396831e3780aea1',
-        '1c5877a570e37300f742409d2b398680e93946bc',
-      ],
-    });
-
-    this.deployRole = new iam.Role(this, 'GitHubActionsDeployRole', {
-      roleName: 'GroupNav-GitHubActionsDeployRole',
-      description: 'Scoped IAM role assumed by GitHub Actions for automated GroupNav CDK deployment',
-      assumedBy: new iam.FederatedPrincipal(
-        this.oidcProvider.openIdConnectProviderArn,
-        {
-          StringEquals: {
-            'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
-          },
-          StringLike: {
-            'token.actions.githubusercontent.com:sub': `repo:${props.githubOwner}/${props.githubRepo}:*`,
-          },
-        },
-        'sts:AssumeRoleWithWebIdentity',
-      ),
-      maxSessionDuration: cdk.Duration.hours(1),
-    });
-
-    this.deployRole.addToPolicy(
-      new iam.PolicyStatement({
-        sid: 'AssumeCdkBootstrapRoles',
-        effect: iam.Effect.ALLOW,
-        actions: ['sts:AssumeRole', 'sts:TagSession'],
-        resources: [
-          `arn:aws:iam::${accountId}:role/cdk-hnb659fds-deploy-role-${accountId}-${region}`,
-          `arn:aws:iam::${accountId}:role/cdk-hnb659fds-file-publishing-role-${accountId}-${region}`,
-          `arn:aws:iam::${accountId}:role/cdk-hnb659fds-lookup-role-${accountId}-${region}`,
-          `arn:aws:iam::${accountId}:role/cdk-hnb659fds-image-publishing-role-${accountId}-${region}`,
-        ],
-      }),
-    );
-
-    this.deployRole.addToPolicy(
-      new iam.PolicyStatement({
-        sid: 'ReadCdkBootstrapVersion',
-        effect: iam.Effect.ALLOW,
-        actions: ['ssm:GetParameter'],
-        resources: [`arn:aws:ssm:${region}:${accountId}:parameter/cdk-bootstrap/hnb659fds/version`],
-      }),
-    );
-
-    // =========================================================================
-    // 6. Stack Outputs
+    // 5. Stack Outputs
     // =========================================================================
     new cdk.CfnOutput(this, 'CodePipelineName', {
       value: this.pipeline.pipelineName,
@@ -240,12 +185,6 @@ export class PipelineStack extends cdk.Stack {
       value: this.artifactBucket.bucketName,
       description: 'S3 Bucket for Pipeline Artifacts and Client Config',
       exportName: 'GroupNavPipelineArtifactBucketName',
-    });
-
-    new cdk.CfnOutput(this, 'GitHubActionsDeployRoleArn', {
-      value: this.deployRole.roleArn,
-      description: 'ARN of IAM role assumed by GitHub Actions via OIDC',
-      exportName: 'GroupNavGitHubActionsDeployRoleArn',
     });
   }
 }

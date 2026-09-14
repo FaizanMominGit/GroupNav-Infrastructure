@@ -89,17 +89,6 @@ describe('PipelineStack (Phase 4 AWS-Native CI/CD)', () => {
     });
   });
 
-  test('Creates GitHub OIDC Provider and scoped Deploy Role as dual deployment option', () => {
-    template.hasResourceProperties('Custom::AWSCDKOpenIdConnectProvider', {
-      Url: 'https://token.actions.githubusercontent.com',
-      ClientIDList: ['sts.amazonaws.com'],
-    });
-
-    template.hasResourceProperties('AWS::IAM::Role', {
-      RoleName: 'GroupNav-GitHubActionsDeployRole',
-    });
-  });
-
   test('Exports Pipeline Name, Connection ARN, and Artifact Bucket as CloudFormation Outputs', () => {
     template.hasOutput('CodePipelineName', {
       Export: {

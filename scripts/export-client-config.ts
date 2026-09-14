@@ -90,7 +90,6 @@ async function main() {
       pipelineArn: pipelineOut.CodePipelineArn || '',
       gitHubConnectionArn: pipelineOut.GitHubConnectionArn || '',
       artifactBucketName: pipelineOut.ArtifactBucketName || '',
-      deployRoleArn: pipelineOut.GitHubActionsDeployRoleArn || '',
     },
   };
 

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../core/services/location_service.dart';
+import '../../auth/models/auth_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../settings/models/rider_settings.dart';
 import '../../settings/providers/settings_provider.dart';
@@ -100,6 +101,22 @@ final iotTelemetryServiceProvider = Provider<IotTelemetryService>((ref) {
   final config = ref.watch(clientConfigProvider);
   final locationService = ref.watch(locationServiceProvider);
   final service = IotTelemetryService(config: config, locationService: locationService);
+
+  // When auth credentials change, connect MQTT if available
+  ref.listen<AuthState>(authNotifierProvider, (previous, next) {
+    final creds = next.awsCredentials;
+    if (creds != null &&
+        creds['AccessKeyId'] != null &&
+        creds['SecretKey'] != null &&
+        !service.isMqttConnected) {
+      service.connectMqtt(
+        accessKeyId: creds['AccessKeyId']!,
+        secretKey: creds['SecretKey']!,
+        sessionToken: creds['SessionToken'],
+      );
+    }
+  });
+
   ref.onDispose(() => service.dispose());
   return service;
 });
@@ -147,6 +164,20 @@ class RadarNotifier extends StateNotifier<RadarState> {
         cohesionStatus: status,
       );
     });
+  }
+
+  void publishAlert({
+    required String packId,
+    required String alertType,
+    String? callsign,
+    String? message,
+  }) {
+    _telemetryService.publishAlert(
+      packId: packId,
+      alertType: alertType,
+      callsign: callsign,
+      message: message,
+    );
   }
 
   void toggleBroadcasting() {

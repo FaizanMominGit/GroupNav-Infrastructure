@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../groups/providers/pack_provider.dart';
 import '../providers/radar_provider.dart';
 import '../widgets/convoy_marker_widget.dart';
 import '../widgets/radar_hud_sheet.dart';
@@ -18,6 +20,40 @@ class LiveRadarScreen extends ConsumerStatefulWidget {
 
 class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
   final MapController _mapController = MapController();
+  StreamSubscription? _alertSub;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final telemetryService = ref.read(iotTelemetryServiceProvider);
+      _alertSub = telemetryService.alertStream.listen((alert) {
+        if (!mounted) return;
+        final callsign = alert['callsign'] ?? 'Convoy';
+        final type = alert['alertType'] ?? 'Alert';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.notifications_active, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Text('Convoy Alert: [$callsign] - $type'),
+              ],
+            ),
+            backgroundColor: AppColors.primary,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _alertSub?.cancel();
+    super.dispose();
+  }
 
   void _recenterOnLeader(LatLng leaderPos) {
     _mapController.move(leaderPos, 15.5);
@@ -257,6 +293,15 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
             child: RadarHudSheet(
               state: radarState,
               onToggleBroadcast: radarNotifier.toggleBroadcasting,
+              onSendQuickAlert: (alertType) {
+                final pack = ref.read(packNotifierProvider);
+                final packId = pack.packId.isNotEmpty ? pack.packId : '804';
+                radarNotifier.publishAlert(
+                  packId: packId,
+                  alertType: alertType,
+                  callsign: 'Apex (Lead)',
+                );
+              },
             ),
           ),
         ],

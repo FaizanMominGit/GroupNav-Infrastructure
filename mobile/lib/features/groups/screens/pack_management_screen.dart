@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -481,77 +482,103 @@ class PackManagementScreen extends ConsumerWidget {
     final controller = TextEditingController(text: 'GN-');
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.cardBg,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.group_add, color: AppColors.primary),
-            const SizedBox(width: 8),
-            const Text('Join Convoy Room'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Enter the 6-character convoy code shared by the convoy lead:',
-              style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: AppColors.cardBg,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.group_add, color: AppColors.primary),
+                const SizedBox(width: 8),
+                const Text('Join Convoy Room'),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              textCapitalization: TextCapitalization.characters,
-              style: AppTypography.telemetryNum.copyWith(
-                fontSize: 18,
-                letterSpacing: 1.5,
-                color: AppColors.primary,
-              ),
-              decoration: InputDecoration(
-                hintText: 'GN-9482',
-                filled: true,
-                fillColor: AppColors.surfaceContainerLow,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.borderSubtle),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Enter the 6-character convoy code or paste pairing payload shared by the lead:',
+                  style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.primary, width: 2),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('Cancel', style: AppTypography.labelMd.copyWith(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final code = controller.text.trim();
-              if (code.isNotEmpty && code != 'GN-') {
-                notifier.joinPack(code);
-                Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Joined Convoy Room "$code"!'),
-                    backgroundColor: AppColors.primary,
-                    duration: const Duration(seconds: 2),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.characters,
+                  style: AppTypography.telemetryNum.copyWith(
+                    fontSize: 16,
+                    letterSpacing: 1.2,
+                    color: AppColors.primary,
                   ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
+                  decoration: InputDecoration(
+                    hintText: 'GN-9482 or QR JSON',
+                    filled: true,
+                    fillColor: AppColors.surfaceContainerLow,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppColors.borderSubtle),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () async {
+                      final data = await Clipboard.getData(Clipboard.kTextPlain);
+                      if (data?.text != null && data!.text!.trim().isNotEmpty) {
+                        setState(() {
+                          controller.text = data.text!.trim();
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.paste, size: 14, color: AppColors.secondary),
+                    label: Text(
+                      'Paste Clipboard Data',
+                      style: AppTypography.labelSm.copyWith(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            child: const Text('Join'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text('Cancel', style: AppTypography.labelMd.copyWith(color: AppColors.textSecondary)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final code = controller.text.trim();
+                  if (code.isNotEmpty && code != 'GN-') {
+                    notifier.joinPack(code);
+                    Navigator.of(ctx).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Joined Convoy Room "$code"!'),
+                        backgroundColor: AppColors.primary,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Join'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

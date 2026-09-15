@@ -114,12 +114,31 @@ class PackNotifier extends StateNotifier<PackFormation> {
     );
   }
 
-  void joinPack(String code) {
-    final cleanCode = code.trim().toUpperCase();
+  void joinPack(String rawInput) {
+    String cleanCode = rawInput.trim();
+    String packId = '';
+
+    if (cleanCode.startsWith('{') && cleanCode.endsWith('}')) {
+      try {
+        final decoded = jsonDecode(cleanCode) as Map<String, dynamic>;
+        cleanCode = decoded['code']?.toString() ?? cleanCode;
+        packId = decoded['packId']?.toString() ?? '';
+      } catch (_) {}
+    }
+
+    cleanCode = cleanCode.toUpperCase();
+    if (!cleanCode.startsWith('GN-') && !cleanCode.startsWith('PACK-')) {
+      cleanCode = 'GN-$cleanCode';
+    }
+    if (packId.isEmpty) {
+      packId = cleanCode.replaceAll(RegExp(r'[^0-9]'), '');
+      if (packId.isEmpty) packId = '804';
+    }
+
     state = state.copyWith(
       isInPack: true,
       packCode: cleanCode,
-      packId: cleanCode.replaceAll('GN-', ''),
+      packId: packId,
       title: 'Pack Formation #$cleanCode',
       isTelemetrySyncActive: true,
       members: _defaultFormation().members,

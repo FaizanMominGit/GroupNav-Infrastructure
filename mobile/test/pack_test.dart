@@ -172,6 +172,31 @@ void main() {
       expect(packNotifier.state.members.length, equals(4));
     });
 
+    test('joinPack parses full QR JSON pairing payload accurately', () {
+      packNotifier.leavePack();
+      expect(packNotifier.state.isInPack, isFalse);
+
+      const qrPayload = '{"action":"join_pack","code":"GN-3391","packId":"3391","timestamp":1729012391000}';
+      packNotifier.joinPack(qrPayload);
+
+      expect(packNotifier.state.isInPack, isTrue);
+      expect(packNotifier.state.packCode, equals('GN-3391'));
+      expect(packNotifier.state.packId, equals('3391'));
+      expect(packNotifier.state.title, equals('Pack Formation #GN-3391'));
+      expect(packNotifier.state.isTelemetrySyncActive, isTrue);
+    });
+
+    test('joinPack normalizes bare numeric code with GN- prefix', () {
+      packNotifier.leavePack();
+      expect(packNotifier.state.isInPack, isFalse);
+
+      packNotifier.joinPack('8842');
+
+      expect(packNotifier.state.isInPack, isTrue);
+      expect(packNotifier.state.packCode, equals('GN-8842'));
+      expect(packNotifier.state.packId, equals('8842'));
+    });
+
     test('createPack generates a new room and assigns user as Convoy Lead', () {
       packNotifier.leavePack();
       expect(packNotifier.state.isInPack, isFalse);

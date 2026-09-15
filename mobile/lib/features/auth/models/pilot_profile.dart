@@ -15,6 +15,15 @@ class PilotProfile {
     this.cognitoSub,
   });
 
+  int get beaconColorValue {
+    try {
+      final hex = beaconColor.replaceAll('#', '');
+      return int.parse('FF$hex', radix: 16);
+    } catch (_) {
+      return 0xFF0066FF;
+    }
+  }
+
   Map<String, dynamic> toJson() => {
     'phoneOrEmail': phoneOrEmail,
     'callsign': callsign,

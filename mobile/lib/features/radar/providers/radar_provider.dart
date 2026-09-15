@@ -32,13 +32,21 @@ class RadarState {
   String get headingDisplay {
     final deg = currentHeading.round();
     String cardinal = 'N';
-    if (deg >= 22.5 && deg < 67.5) cardinal = 'NE';
-    else if (deg >= 67.5 && deg < 112.5) cardinal = 'E';
-    else if (deg >= 112.5 && deg < 157.5) cardinal = 'SE';
-    else if (deg >= 157.5 && deg < 202.5) cardinal = 'S';
-    else if (deg >= 202.5 && deg < 247.5) cardinal = 'SW';
-    else if (deg >= 247.5 && deg < 292.5) cardinal = 'W';
-    else if (deg >= 292.5 && deg < 337.5) cardinal = 'NW';
+    if (deg >= 22.5 && deg < 67.5) {
+      cardinal = 'NE';
+    } else if (deg >= 67.5 && deg < 112.5) {
+      cardinal = 'E';
+    } else if (deg >= 112.5 && deg < 157.5) {
+      cardinal = 'SE';
+    } else if (deg >= 157.5 && deg < 202.5) {
+      cardinal = 'S';
+    } else if (deg >= 202.5 && deg < 247.5) {
+      cardinal = 'SW';
+    } else if (deg >= 247.5 && deg < 292.5) {
+      cardinal = 'W';
+    } else if (deg >= 292.5 && deg < 337.5) {
+      cardinal = 'NW';
+    }
 
     return '$cardinal ${deg.toString().padLeft(3, '0')}°';
   }

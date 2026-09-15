@@ -9,6 +9,7 @@ import '../auth/providers/auth_provider.dart';
 import '../auth/screens/auth_onboarding_screen.dart';
 import '../groups/screens/pack_management_screen.dart';
 import '../radar/screens/live_radar_screen.dart';
+import '../settings/screens/rider_settings_screen.dart';
 
 class MainShellScreen extends ConsumerStatefulWidget {
   final ClientConfig config;
@@ -35,7 +36,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: (_currentTabIndex == 0 || _currentTabIndex == 1)
+      appBar: (_currentTabIndex == 0 || _currentTabIndex == 1 || _currentTabIndex == 3)
           ? null
           : TopAppBarPill(
               title: 'GroupNav',
@@ -54,7 +55,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           ),
           const LiveRadarScreen(),
           _buildPlaceholderScreen('Trip History', 'Aurora PostgreSQL PostGIS replay ledger', Icons.history),
-          _buildSettingsScreen(pilot.callsign, pilot.vehicleClass, pilot.cognitoIdentityId),
+          RiderSettingsScreen(config: widget.config),
         ],
       ),
       bottomNavigationBar: ConvoyBottomNavBar(
@@ -70,75 +71,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
 
 
 
-  Widget _buildSettingsScreen(String callsign, String vehicleClass, String? identityId) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: ListView(
-        children: [
-          Text('Rider & Infrastructure Settings', style: AppTypography.headlineMd),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Pilot Profile', style: AppTypography.labelLg),
-                  const Divider(height: 20),
-                  _buildConfigRow('Callsign', callsign),
-                  _buildConfigRow('Vehicle Class', vehicleClass),
-                  _buildConfigRow('Identity ID', identityId ?? 'ap-south-1:...'),
-                  const SizedBox(height: 12),
-                  Text('AWS Backend Link', style: AppTypography.labelLg),
-                  const Divider(height: 20),
-                  _buildConfigRow('Cognito User Pool', widget.config.cognito.userPoolId),
-                  _buildConfigRow('Identity Pool', widget.config.cognito.identityPoolId),
-                  _buildConfigRow('IoT Topic Pattern', widget.config.compute.telemetryTopicPattern),
-                  _buildConfigRow('Redis Endpoint', widget.config.data.redisEndpoint),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: () => ref.read(authNotifierProvider.notifier).signOut(),
-            icon: const Icon(Icons.logout, color: Colors.white),
-            label: const Text('Sign Out of Cognito Session'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.alertCritical,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildConfigRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 130,
-            child: Text(label, style: AppTypography.labelSm.copyWith(color: AppColors.textSecondary)),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: AppTypography.bodySm.copyWith(
-                fontFamily: 'monospace',
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildPlaceholderScreen(String title, String desc, IconData icon) {
     return Center(

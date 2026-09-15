@@ -477,11 +477,11 @@ flowchart TD
   - [x] Build QR code pairing modal for in-person mesh rendezvous.
   - [x] Implement geofence radius slider (200m to 5,000m) connected to Amazon Location Service geofence collection.
   - [x] Build roster cards showing member relative offsets, speeds, and ping alerts.
-- [ ] **Phase 5: Rider Settings Screen (`/settings`)**
-  - [ ] Implement GPS update frequency segmented control (1 Hz, 5 Hz, 10 Hz) tied to device location stream.
-  - [ ] Implement unit switch (`km/h` vs `mph`) and map theme toggles.
-  - [ ] Display active Cognito Identity ID and IAM Role ARN with copy button.
-  - [ ] Implement `Sign Out` flow terminating active MQTT sessions and clearing device credentials.
+- [x] **Phase 5: Rider Settings Screen (`/settings`)**
+  - [x] Implement GPS update frequency segmented control (1 Hz, 5 Hz, 10 Hz) tied to device location stream.
+  - [x] Implement unit switch (`km/h` vs `mph`) and map theme toggles.
+  - [x] Display active Cognito Identity ID and IAM Role ARN with copy button.
+  - [x] Implement `Sign Out` flow terminating active MQTT sessions and clearing device credentials.
 - [ ] **Phase 6: Trip History & Analytics Screen (`/trips`)**
   - [ ] Build interactive trip replay player with Play/Pause, scrubber, and 1.5x speed toggle.
   - [ ] Render synchronized SVG elevation area chart (0m–850m) overlaid with speed polyline.

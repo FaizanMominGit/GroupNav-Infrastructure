@@ -302,3 +302,32 @@ When an issue, error, or unexpected behavior is encountered, document it using t
   `flutter --version` verified working and active in terminal sessions.
 - **Prevention Rule**:
   Always verify the local volume topology and install developer SDKs to `C:\flutter` if secondary drives are not present.
+
+---
+
+### [ISSUE-016] Android Platform Missing and Corrupted NDK CXX1101 Build Failure
+- **Date & Phase**: 2026-09-15 | UI Testing on Physical Device
+- **Component / Command**: `flutter install` / `flutter run -d <DEVICE_ID>` / Android Gradle Plugin
+- **Symptom / Error Message**:
+  1. Initial run failed:
+     ```
+     AndroidManifest.xml could not be found.
+     Please check C:\Users\faizan\Downloads\AWS\mobile\android\AndroidManifest.xml for errors.
+     ```
+  2. Subsequent Gradle build failed after generating scaffold:
+     ```
+     > com.android.builder.errors.EvalIssueException: [CXX1101] NDK at C:\Users\faizan\AppData\Local\Android\sdk\ndk\28.2.13676358 did not have a source.properties file
+     BUILD FAILED in 13s
+     Running Gradle task 'assembleDebug'... 14.2s
+     ```
+- **Root Cause Analysis**:
+  1. The Flutter workspace under `mobile/` originally only contained Dart source files (`lib/`, `test/`) and lacked the native Android platform scaffolding (`android/`).
+  2. During the initial background compilation, the background process was interrupted or timed out while AGP was downloading the 28.2.13676358 NDK package, leaving a half-downloaded directory lacking `source.properties`.
+- **Fix / Solution Applied**:
+  1. Re-generated the clean Android platform harness using `flutter create . --platforms android`.
+  2. Cleaned out the corrupted NDK folder with `Remove-Item -Recurse -Force "C:\Users\faizan\AppData\Local\Android\sdk\ndk\28.2.13676358"`.
+  3. Re-ran `flutter run -d <DEVICE_ID>` allowing Gradle to cleanly re-fetch the NDK and compile the debug APK.
+- **Verification**:
+  App launched successfully on physical Android device (`RMX3997`, PID: 9406) with active touch dispatch and viewport metrics streaming.
+- **Prevention Rule**:
+  If Gradle compilation fails with `CXX1101 source.properties missing`, always remove the corresponding NDK directory in `AppData/Local/Android/sdk/ndk/` before retrying the build.

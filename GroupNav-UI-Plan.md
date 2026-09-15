@@ -447,11 +447,12 @@ flowchart TD
 | Client Screen | Path | Visual Components | Backend Service | Connection Protocol | Scoped IAM Action |
 |:---|:---|:---|:---|:---|:---|
 | **1. Auth & Onboarding** | `/auth` | Phone/Email input, OTP Modal, Callsign, Vehicle selector | **Amazon Cognito** | HTTPS / REST (Cognito IDP API) | `cognito-idp:InitiateAuth`, `cognito-identity:GetCredentialsForIdentity` |
-| **2. Live Radar & HUD** | `/radar` | MapLibre vector map, 800m geofence ring, Speed/Cohesion HUD, broadcast toggle | **Amazon Location Service**, **AWS IoT Core**, **Redis** | HTTPS (Vector Tiles) + WSS MQTT over TLS (SigV4) | `geo:GetMapTile`, `geo:GetMapGlyphs`, `iot:Connect`, `iot:Publish` |
-| **3. Pack Formation** | `/groups` | Group code `GN-9482`, QR code, Geofence radius slider, Member list | **Amazon Location Service**, **Backend API / DynamoDB** | HTTPS REST / GraphQL | `geo:PutGeofence`, `geo:GetGeofence` |
-| **4. Rider Settings** | `/settings` | GPS rate (1-10Hz), background toggle, Cognito ID copy, Sign Out | **Amazon Cognito**, **Device Keystore** | Local IPC + HTTPS | `cognito-idp:GlobalSignOut` |
+| **2. Live Radar & HUD** | `/radar` | MapLibre vector map, 800m geofence ring, Speed/Heading/Pack Status HUD, Quick status alerts | **Amazon Location Service**, **AWS IoT Core**, **Redis** | HTTPS (Vector Tiles) + WSS MQTT over TLS (SigV4) | `geo:GetMapTile`, `geo:GetMapGlyphs`, `iot:Connect`, `iot:Publish` |
+| **3. Pack Formation** | `/groups` | Group code `GN-9482`, QR code, Geofence radius slider, Member roster, SOS Broadcast | **Amazon Location Service**, **Backend API / DynamoDB** | HTTPS REST / GraphQL | `geo:PutGeofence`, `geo:GetGeofence` |
+| **4. Rider Settings** | `/settings` | Profile & identity, ride alerts, units/theme, location & privacy, Leave Pack / Sign Out | **Amazon Cognito**, **Device Keystore** | Local IPC + HTTPS | `cognito-idp:GlobalSignOut` |
 | **5. Trip History** | `/trips` | Replay scrubber (1.5x), LiDAR elevation chart, GPX/GeoJSON export | **Aurora Serverless v2 PostgreSQL (PostGIS)** | HTTPS REST / Aurora Data API | Scoped API Gateway query execution |
-| **6. Pipeline Health** | `/telemetry`| CloudWatch 2x2 grid, Live scrolling JSON MQTT terminal | **Amazon CloudWatch**, **AWS IoT Core** | HTTPS (CloudWatch) + WSS MQTT (Debug topic) | `cloudwatch:GetMetricData`, `iot:Subscribe` |
+
+*(Note: Pipeline Health (`/telemetry`) was retired from the client application per product direction as operational infrastructure telemetry is managed via AWS CloudWatch directly).*
 
 ---
 
@@ -459,8 +460,8 @@ flowchart TD
 
 - [x] **Phase 1: Foundation & Setup**
   - [x] Bundle and test loading of [`client-config.json`](file:///d:/chirag/GroupNav-Infrastructure/client-config.json).
-  - [x] Implement design system tokens (`colors`, `typography`, `elevation`, `spacing`) from [`groupnav_template.md`](file:///d:/chirag/GroupNav-Infrastructure/groupnav_template.md).
-  - [x] Build shared shell components (`TopAppBar`, `BottomNavBar` with active state routing).
+  - [x] Implement design system tokens (`colors`, `typography`, `elevation`, `spacing`) from [`convoy_telemetry/DESIGN.md`](file:///C:/Users/faizan/Downloads/stitch_groupnav_web3_convoy_tracker/stitch_groupnav_web3_convoy_tracker/convoy_telemetry/DESIGN.md).
+  - [x] Build shared shell components (`TopAppBar`, `BottomNavBar` with 4-tab active state routing: Convoy, Radar, Trips, Settings).
 - [x] **Phase 2: Authentication Screen (`/auth`)**
   - [x] Implement phone/email input and callsign form fields with validation.
   - [x] Implement vehicle class selector (Sportbike, Adventure, Touring, Cruiser) and beacon color swatches.
@@ -470,25 +471,26 @@ flowchart TD
   - [x] Initialize MapLibre GL map with Amazon Location Service `GroupNavMap` vector style.
   - [x] Render 800m circular dashed geofence boundary mesh and glowing navigation polyline.
   - [x] Render animated leader marker and peer rider offset chips.
-  - [x] Build 4-card HUD bottom sheet (Speed, Heading, Elevation, Pack Cohesion).
+  - [x] Build 3-metric bento HUD bottom sheet (Speed, Heading, Pack Status) and Quick Convoy Status alert buttons (Regroup, Refuel, Issue, Custom).
   - [x] Integrate AWS IoT Core WebSocket client with SigV4 signing; wire broadcast toggle switch (QoS 1).
 - [x] **Phase 4: Pack Management Screen (`/groups`)**
-  - [x] Render active pack formation header and group code box (`GN-9482`) with copy action.
-  - [x] Build QR code pairing modal for in-person mesh rendezvous.
+  - [x] Render active pack formation header and group code box (`GN-9482`) with copy action and QR pairing.
   - [x] Implement geofence radius slider (200m to 5,000m) connected to Amazon Location Service geofence collection.
-  - [x] Build roster cards showing member relative offsets, speeds, and ping alerts.
+  - [x] Build roster cards showing member relative offsets, speeds, and ping alerts with zero 360dp overflow.
+  - [x] Implement high-visibility Broadcast Pack SOS (Emergency) trigger button.
 - [x] **Phase 5: Rider Settings Screen (`/settings`)**
-  - [x] Implement GPS update frequency segmented control (1 Hz, 5 Hz, 10 Hz) tied to device location stream.
-  - [x] Implement unit switch (`km/h` vs `mph`) and map theme toggles.
-  - [x] Display active Cognito Identity ID and IAM Role ARN with copy button.
-  - [x] Implement `Sign Out` flow terminating active MQTT sessions and clearing device credentials.
+  - [x] Implement Profile & Identity card with real-time Callsign edit, Vehicle change, and Emergency Contact update.
+  - [x] Implement Ride & Convoy Alerts (Geofence departure warning, Speed alert, Voice & audio cues).
+  - [x] Implement Navigation & Display (Metric vs Imperial, Day/Night/Auto theme, Keep screen awake).
+  - [x] Implement Location & Privacy (Real-time group location sharing, GPS refresh rate: 1s, 500ms, 100ms).
+  - [x] Implement Leave Pack / Log Out flow terminating active MQTT sessions and clearing device credentials.
 - [x] **Phase 6: Trip History & Analytics Screen (`/trips`)**
   - [x] Build interactive trip replay player with Play/Pause, scrubber, and 1.5x speed toggle.
   - [x] Render synchronized SVG elevation area chart (0m–850m) overlaid with speed polyline.
   - [x] Fetch recorded trips from Aurora PostgreSQL PostGIS backend.
-  - [x] Wire GPX and GeoJSON trip export handlers.
-- [x] **Phase 7: Observability Screen (`/telemetry`)**
-  - [x] Build 2x2 operational metrics grid (Lambda, Redis, DLQ, MQTT Ingest).
-  - [x] Build dark developer terminal window streaming real-time MQTT JSON records.
-  - [x] Add direct launch link to the AWS CloudWatch Dashboard.
+  - [x] Wire GPX and GeoJSON trip export handlers with responsive wrapping.
+- [x] **UI Refresh & Telemetry Removal Milestone**
+  - [x] Retired `/telemetry` screen and restored bottom navigation bar to 4 core tabs.
+  - [x] Aligned all screens with updated Stitch mockups (`stitch_groupnav_web3_convoy_tracker`).
+  - [x] Audited and verified zero RenderFlex overflows on 360dp physical mobile screens (`RMX3997`).
 

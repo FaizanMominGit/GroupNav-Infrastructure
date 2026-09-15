@@ -331,3 +331,25 @@ When an issue, error, or unexpected behavior is encountered, document it using t
   App launched successfully on physical Android device (`RMX3997`, PID: 9406) with active touch dispatch and viewport metrics streaming.
 - **Prevention Rule**:
   If Gradle compilation fails with `CXX1101 source.properties missing`, always remove the corresponding NDK directory in `AppData/Local/Android/sdk/ndk/` before retrying the build.
+
+---
+
+### [ISSUE-017] RenderFlex Overflow on 360dp Viewport Mobile Devices
+- **Date & Phase**: 2026-09-15 | UI Polish & Mobile Device Verification
+- **Component / Command**: `PackManagementScreen`, `RecordedConvoysCard`, `ActiveCodeCard` on 360dp Android phone (`RMX3997`)
+- **Symptom / Error Message**:
+  ```
+  A RenderFlex overflowed by 9.3 pixels on the right.
+  The relevant error-causing widget was: Row
+  ```
+- **Root Cause Analysis**:
+  Certain cards used unconstrained nested `Row` widgets containing fixed-width icons, titles, and trailing status pills/buttons. On 360dp viewports, the total width `(360 - 32 padding - 32 card padding = 296dp)` was insufficient for side-by-side elements without flexible boundaries.
+- **Fix / Solution Applied**:
+  1. Wrapped primary text content columns in `Expanded` or `Flexible` with `TextOverflow.ellipsis`.
+  2. Wrapped secondary action button groups (such as `Export GPX` and `Export GeoJSON`) in `Wrap` with `WrapAlignment.spaceBetween`.
+  3. Streamlined horizontal badge chains into 2-column flex layouts matching the updated Stitch mockups (`stitch_groupnav_web3_convoy_tracker`).
+- **Verification**:
+  All 4 core tabs tested with Flutter test suite (46 passing tests) and verified on 360dp mobile viewport with zero `RenderFlex` overflow errors.
+- **Prevention Rule**:
+  Never use unconstrained `Row` children inside compact mobile cards. Always wrap variable-width text in `Expanded` or `Flexible`, and wrap multi-button action bars in `Wrap`.
+

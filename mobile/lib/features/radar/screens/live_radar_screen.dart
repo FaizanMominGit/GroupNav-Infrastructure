@@ -140,51 +140,80 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
             right: 14,
             child: Container(
               height: 52,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
                 color: AppColors.cardBg,
                 borderRadius: AppTheme.radiusFull,
                 boxShadow: AppTheme.elevationLevel2,
-                border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+                border: Border.all(color: AppColors.borderSubtle.withValues(alpha: 0.8)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.near_me, color: AppColors.primary, size: 22),
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: const BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.menu, color: AppColors.textPrimary, size: 18),
+                  ),
                   const SizedBox(width: 8),
+                  const Icon(Icons.navigation, color: AppColors.primary, size: 18),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('ACTIVE ROUTE', style: AppTypography.labelSm.copyWith(fontSize: 9, color: AppColors.textSecondary)),
-                        Text('Skyline Summit', style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.w800)),
+                        Text(
+                          'ACTIVE ROUTE',
+                          style: AppTypography.labelSm.copyWith(
+                            fontSize: 9,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'Skyline Summit Run',
+                          style: AppTypography.labelLg.copyWith(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
-                  // Live DePIN NAV Token Ticker & Wallet Pill
+                  const SizedBox(width: 6),
+                  // Active Live Convoy Pill
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: AppColors.surfaceContainerLow,
                       borderRadius: AppTheme.radiusFull,
                       border: Border.all(color: AppColors.borderSubtle),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          width: 6,
-                          height: 6,
+                          width: 7,
+                          height: 7,
                           decoration: const BoxDecoration(
                             color: AppColors.telemetryEmerald,
                             shape: BoxShape.circle,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Text('142.8 \$NAV', style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w700)),
-                        const SizedBox(width: 6),
-                        Container(width: 1, height: 12, color: AppColors.borderSubtle),
-                        const SizedBox(width: 6),
-                        Text('0x7F2', style: AppTypography.labelSm.copyWith(fontFamily: 'monospace', color: AppColors.textSecondary)),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${radarState.peers.length + 1} Live',
+                          style: AppTypography.labelSm.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                          ),
+                        ),
                       ],
                     ),
                   ),

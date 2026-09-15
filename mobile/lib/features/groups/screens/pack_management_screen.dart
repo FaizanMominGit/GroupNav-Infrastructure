@@ -42,58 +42,63 @@ class PackManagementScreen extends ConsumerWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.navigation,
-                          color: AppColors.primary,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            formation.title,
-                            style: AppTypography.headlineMd.copyWith(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                            ),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          const SizedBox(height: 2),
-                          Row(
+                          child: const Icon(
+                            Icons.navigation,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Container(
-                                width: 7,
-                                height: 7,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.telemetryEmerald,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 5),
                               Text(
-                                'ACTIVE TELEMETRY SYNC',
-                                style: AppTypography.labelSm.copyWith(
-                                  fontSize: 10,
-                                  color: AppColors.secondary,
+                                formation.title,
+                                style: AppTypography.headlineMd.copyWith(
+                                  fontSize: 16,
                                   fontWeight: FontWeight.w700,
                                 ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.telemetryEmerald,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    '${formation.connectedCount} Riders Connected',
+                                    style: AppTypography.labelSm.copyWith(
+                                      fontSize: 11,
+                                      color: AppColors.secondary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
 
                   // Share Pack Details Action
@@ -138,53 +143,19 @@ class PackManagementScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Text(
-                    'Live Pack Roster',
-                    style: AppTypography.headlineMd.copyWith(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.secondaryContainer.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${formation.connectedCount} Connected',
-                      style: AppTypography.labelSm.copyWith(
-                        fontSize: 10,
-                        color: AppColors.onSecondaryContainer,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
+              Text(
+                'Riders in Pack',
+                style: AppTypography.headlineMd.copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-              Row(
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: AppColors.telemetryEmerald,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    'Redis Spatial ms-sync',
-                    style: AppTypography.labelSm.copyWith(
-                      fontSize: 10,
-                      fontFamily: 'monospace',
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
+              Text(
+                '${formation.members.length} members',
+                style: AppTypography.bodySm.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
           ),

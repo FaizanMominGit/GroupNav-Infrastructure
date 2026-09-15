@@ -5,11 +5,11 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
-import '../widgets/cloud_identity_card.dart';
-import '../widgets/display_preferences_card.dart';
-import '../widgets/profile_summary_card.dart';
+import '../widgets/convoy_alerts_card.dart';
+import '../widgets/location_privacy_card.dart';
+import '../widgets/navigation_display_card.dart';
+import '../widgets/profile_identity_card.dart';
 import '../widgets/sign_out_dialog.dart';
-import '../widgets/telemetry_controls_card.dart';
 
 class RiderSettingsScreen extends ConsumerWidget {
   final ClientConfig config;
@@ -18,124 +18,225 @@ class RiderSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authNotifierProvider);
+    final authNotifier = ref.read(authNotifierProvider.notifier);
     final settings = ref.watch(settingsNotifierProvider);
     final settingsNotifier = ref.read(settingsNotifierProvider.notifier);
-
-    final pilot = authState.pilot;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        child: Column(
           children: [
-            // Screen Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Rider & Infrastructure',
-                      style: AppTypography.headlineLg.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Telemetry parameters & AWS node identity',
-                      style: AppTypography.bodySm.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
+            // Floating Sticky Top App Bar
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.cardBg,
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: AppColors.borderSubtle.withValues(alpha: 0.8)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
                   ),
-                  child: const Icon(Icons.settings, color: AppColors.primary, size: 20),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Pilot Profile Summary Card
-            if (pilot != null) ...[
-              ProfileSummaryCard(pilot: pilot),
-              const SizedBox(height: 16),
-            ],
-
-            // Telemetry & Hardware Controls Card
-            TelemetryControlsCard(
-              settings: settings,
-              onGpsRateChanged: settingsNotifier.setGpsRate,
-              onBackgroundBroadcastChanged: settingsNotifier.toggleBackgroundBroadcast,
-              onHighPrecisionAlertChanged: settingsNotifier.toggleHighPrecisionAlert,
-            ),
-            const SizedBox(height: 16),
-
-            // Display & Units Preferences Card
-            DisplayPreferencesCard(
-              settings: settings,
-              onUnitSystemChanged: settingsNotifier.setUnitSystem,
-              onMapThemeChanged: settingsNotifier.setMapTheme,
-              onCohesionPingAudioChanged: settingsNotifier.toggleCohesionPingAudio,
-            ),
-            const SizedBox(height: 16),
-
-            // AWS Cloud & DePIN Identity Card
-            CloudIdentityCard(
-              settings: settings,
-              config: config,
-              cognitoIdentityId: pilot?.cognitoIdentityId,
-            ),
-            const SizedBox(height: 24),
-
-            // Destructive Sign Out Action
-            ElevatedButton.icon(
-              onPressed: () {
-                SignOutDialog.show(
-                  context,
-                  onConfirm: () {
-                    ref.read(authNotifierProvider.notifier).signOut();
-                  },
-                );
-              },
-              icon: const Icon(Icons.logout, color: Colors.white, size: 20),
-              label: Text(
-                'Sign Out of Cognito Session',
-                style: AppTypography.labelMd.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
+                ],
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.alertCritical,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-            ),
-            const SizedBox(height: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: const BoxDecoration(
+                          color: AppColors.surfaceContainerLow,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.menu,
+                          color: AppColors.textPrimary,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'GroupNav',
+                        style: AppTypography.headlineMd.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ],
+                  ),
 
-            Center(
-              child: Text(
-                'GroupNav DePIN Client v1.0.0 • Build #1',
-                style: AppTypography.bodySm.copyWith(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
-                ),
+                  // Active Pilot Thumbnail & Status Pill
+                  Container(
+                    padding: const EdgeInsets.only(left: 10, right: 4, top: 4, bottom: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.borderSubtle),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'CALLSIGN',
+                              style: AppTypography.labelSm.copyWith(
+                                fontSize: 9,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              settings.callsign,
+                              style: AppTypography.labelMd.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.telemetryEmerald, width: 2),
+                            color: AppColors.primaryFixed,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            settings.callsign.length >= 2
+                                ? settings.callsign.substring(0, 2).toUpperCase()
+                                : 'AP',
+                            style: AppTypography.labelSm.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
+
+            // Main Settings Scrollable List
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                children: [
+                  // Section 1: Profile & Identity
+                  ProfileIdentityCard(
+                    settings: settings,
+                    onUpdateCallsign: settingsNotifier.setCallsign,
+                    onUpdateVehicle: settingsNotifier.setVehicle,
+                    onUpdateEmergencyContact: settingsNotifier.setEmergencyContact,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Section 2: Ride & Convoy Alerts
+                  ConvoyAlertsCard(
+                    settings: settings,
+                    onToggleGeofenceWarning: settingsNotifier.toggleGeofenceDepartureWarning,
+                    onToggleSpeedAlert: settingsNotifier.toggleSpeedAlert,
+                    onToggleVoiceAudioCues: settingsNotifier.toggleVoiceAudioCues,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Section 3: Navigation & Display
+                  NavigationDisplayCard(
+                    settings: settings,
+                    onUnitSystemChanged: settingsNotifier.setUnitSystem,
+                    onMapThemeChanged: settingsNotifier.setMapTheme,
+                    onToggleKeepScreenAwake: settingsNotifier.toggleKeepScreenAwake,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Section 4: Location & Privacy
+                  LocationPrivacyCard(
+                    settings: settings,
+                    onToggleShareLocation: settingsNotifier.toggleShareRealTimeLocation,
+                    onGpsRateChanged: settingsNotifier.setGpsRate,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Section 5: Destructive Action - Leave Pack / Log Out
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.alertCritical.withValues(alpha: 0.35),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          SignOutDialog.show(
+                            context,
+                            onConfirm: () => authNotifier.signOut(),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.logout,
+                                color: AppColors.alertCritical,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Leave Pack / Log Out',
+                                style: AppTypography.labelLg.copyWith(
+                                  color: AppColors.alertCritical,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'You will remain logged in on this device until you sign out.',
+                    style: AppTypography.bodySm.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
           ],
         ),
       ),

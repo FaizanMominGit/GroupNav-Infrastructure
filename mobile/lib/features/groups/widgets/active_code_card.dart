@@ -41,81 +41,87 @@ class ActiveCodeCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               // Code display and copy action
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'ACTIVE GROUP CODE',
-                    style: AppTypography.labelSm.copyWith(
-                      fontSize: 10,
-                      color: AppColors.textSecondary,
-                      letterSpacing: 0.8,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'PACK JOIN CODE',
+                      style: AppTypography.labelSm.copyWith(
+                        fontSize: 10,
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      // Monospace Code Container
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryFixed.withValues(alpha: 0.40),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.20)),
-                        ),
-                        child: Text(
-                          formation.packCode,
-                          style: AppTypography.headlineLg.copyWith(
-                            fontFamily: 'monospace',
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 2,
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        // Monospace Code Container
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryFixed.withValues(alpha: 0.40),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.20)),
+                          ),
+                          child: Text(
+                            formation.packCode,
+                            style: AppTypography.headlineLg.copyWith(
+                              fontFamily: 'monospace',
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 18,
+                              letterSpacing: 1.5,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
+                        const SizedBox(width: 8),
 
-                      // Copy Code Button
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () {
-                            Clipboard.setData(ClipboardData(text: formation.packCode));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Group Code "${formation.packCode}" copied!'),
-                                backgroundColor: AppColors.primary,
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            height: 44,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.content_copy, size: 18, color: AppColors.primary),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Copy',
-                                  style: AppTypography.labelMd.copyWith(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                        // Copy Code Button
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              Clipboard.setData(ClipboardData(text: formation.packCode));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Pack code "${formation.packCode}" copied!'),
+                                  backgroundColor: AppColors.primary,
+                                  duration: const Duration(seconds: 2),
                                 ),
-                              ],
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              height: 40,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.content_copy, size: 16, color: AppColors.primary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Copy',
+                                    style: AppTypography.labelSm.copyWith(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
 
               // Pair QR Action Button

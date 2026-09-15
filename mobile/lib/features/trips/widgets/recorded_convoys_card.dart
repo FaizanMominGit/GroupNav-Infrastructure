@@ -160,17 +160,22 @@ class RecordedConvoysCard extends StatelessWidget {
           const Divider(height: 24, color: AppColors.borderSubtle),
 
           // Export Actions Section
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
             children: [
               Text(
                 'EXPORT SPATIAL TRACK',
                 style: AppTypography.labelSm.copyWith(
                   color: AppColors.textSecondary,
                   letterSpacing: 0.5,
+                  fontSize: 10,
                 ),
               ),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   OutlinedButton.icon(
                     onPressed: () => _exportGpx(context, selectedTrip),

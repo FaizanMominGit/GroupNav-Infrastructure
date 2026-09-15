@@ -147,5 +147,47 @@ void main() {
       notifier.toggleCohesionPingAudio(false);
       expect(notifier.state.cohesionPingAudio, false);
     });
+
+    test('Profile & Identity mutations update state correctly', () {
+      final notifier = SettingsNotifier();
+      expect(notifier.state.callsign, '0xApex');
+      expect(notifier.state.vehicle, 'Motorcycle (Ducati Panigale)');
+      expect(notifier.state.emergencyContact, 'Elena (+1 555-0199)');
+
+      notifier.setCallsign('ViperOne');
+      notifier.setVehicle('BMW S1000RR');
+      notifier.setEmergencyContact('Marcus (+1 555-0200)');
+
+      expect(notifier.state.callsign, 'ViperOne');
+      expect(notifier.state.vehicle, 'BMW S1000RR');
+      expect(notifier.state.emergencyContact, 'Marcus (+1 555-0200)');
+    });
+
+    test('Ride & Convoy Alert toggles update state correctly', () {
+      final notifier = SettingsNotifier();
+      expect(notifier.state.geofenceDepartureWarning, true);
+      expect(notifier.state.speedAlert, true);
+      expect(notifier.state.voiceAudioCues, true);
+
+      notifier.toggleGeofenceDepartureWarning(false);
+      notifier.toggleSpeedAlert(false);
+      notifier.toggleVoiceAudioCues(false);
+
+      expect(notifier.state.geofenceDepartureWarning, false);
+      expect(notifier.state.speedAlert, false);
+      expect(notifier.state.voiceAudioCues, false);
+    });
+
+    test('Location & Privacy toggles update state correctly', () {
+      final notifier = SettingsNotifier();
+      expect(notifier.state.shareRealTimeLocation, true);
+      expect(notifier.state.keepScreenAwake, true);
+
+      notifier.toggleShareRealTimeLocation(false);
+      notifier.toggleKeepScreenAwake(false);
+
+      expect(notifier.state.shareRealTimeLocation, false);
+      expect(notifier.state.keepScreenAwake, false);
+    });
   });
 }

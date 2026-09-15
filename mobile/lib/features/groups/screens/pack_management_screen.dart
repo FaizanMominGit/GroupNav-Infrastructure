@@ -49,11 +49,13 @@ class PackManagementScreen extends ConsumerWidget {
                           width: 38,
                           height: 38,
                           decoration: BoxDecoration(
-                            color: AppColors.surfaceContainerLow,
+                            color: formation.isInPack
+                                ? AppColors.surfaceContainerLow
+                                : AppColors.primaryFixed.withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(
-                            Icons.navigation,
+                          child: Icon(
+                            formation.isInPack ? Icons.navigation : Icons.person_pin_circle,
                             color: AppColors.primary,
                             size: 20,
                           ),
@@ -65,7 +67,7 @@ class PackManagementScreen extends ConsumerWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                formation.title,
+                                formation.isInPack ? formation.title : 'Solo Ride Mode',
                                 style: AppTypography.headlineMd.copyWith(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -78,18 +80,27 @@ class PackManagementScreen extends ConsumerWidget {
                                   Container(
                                     width: 7,
                                     height: 7,
-                                    decoration: const BoxDecoration(
-                                      color: AppColors.telemetryEmerald,
+                                    decoration: BoxDecoration(
+                                      color: formation.isInPack
+                                          ? AppColors.telemetryEmerald
+                                          : AppColors.textSecondary,
                                       shape: BoxShape.circle,
                                     ),
                                   ),
                                   const SizedBox(width: 5),
-                                  Text(
-                                    '${formation.connectedCount} Riders Connected',
-                                    style: AppTypography.labelSm.copyWith(
-                                      fontSize: 11,
-                                      color: AppColors.secondary,
-                                      fontWeight: FontWeight.w700,
+                                  Flexible(
+                                    child: Text(
+                                      formation.isInPack
+                                          ? '${formation.connectedCount} Riders Connected'
+                                          : 'Independent Pilot (No Active Pack)',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.labelSm.copyWith(
+                                        fontSize: 11,
+                                        color: formation.isInPack
+                                            ? AppColors.secondary
+                                            : AppColors.textSecondary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -100,131 +111,445 @@ class PackManagementScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
 
-                  // Share Pack Details Action
-                  IconButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Convoy invite code "${formation.packCode}" copied to share!'),
-                          backgroundColor: AppColors.primary,
-                          duration: const Duration(seconds: 2),
+                  if (formation.isInPack) ...[
+                    // Leave Pack Action Pill in AppBar
+                    OutlinedButton.icon(
+                      onPressed: () => _confirmLeavePack(context, packNotifier, formation.packCode),
+                      icon: const Icon(Icons.exit_to_app, size: 14, color: AppColors.alertCritical),
+                      label: Text(
+                        'Leave',
+                        style: AppTypography.labelSm.copyWith(
+                          color: AppColors.alertCritical,
+                          fontWeight: FontWeight.w700,
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.share, color: AppColors.primary),
-                    tooltip: 'Share Pack Details',
-                  ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: AppColors.alertCritical.withValues(alpha: 0.4)),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ] else ...[
+                    // Join Pack Action Pill
+                    ElevatedButton.icon(
+                      onPressed: () => _showJoinPackDialog(context, packNotifier),
+                      icon: const Icon(Icons.group_add, size: 14, color: Colors.white),
+                      label: Text(
+                        'Join Pack',
+                        style: AppTypography.labelSm.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-        children: [
-          // 1. Active Group Code & Collapsed Mini-Map Preview Card
-          ActiveCodeCard(
-            formation: formation,
-            onExpandMap: onExpandMap,
-            qrPayload: packNotifier.generateQrPayload(),
-          ),
-          const SizedBox(height: 16),
+      body: formation.isInPack
+          ? _buildInPackView(context, formation, packNotifier)
+          : _buildSoloView(context, formation, packNotifier),
+    );
+  }
 
-          // 2. Dynamic Geofence Radius Slider Widget
-          GeofenceSliderWidget(
-            formation: formation,
-            onRadiusChanged: (val) => packNotifier.updateGeofenceRadius(val),
-          ),
-          const SizedBox(height: 20),
+  // ---------------------------------------------------------------------------
+  // Active Pack Mode View
+  // ---------------------------------------------------------------------------
+  Widget _buildInPackView(BuildContext context, dynamic formation, PackNotifier packNotifier) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+      children: [
+        // 1. Active Group Code & Collapsed Mini-Map Preview Card
+        ActiveCodeCard(
+          formation: formation,
+          onExpandMap: onExpandMap,
+          qrPayload: packNotifier.generateQrPayload(),
+        ),
+        const SizedBox(height: 16),
 
-          // 3. Live Pack Roster Section Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Riders in Pack',
-                style: AppTypography.headlineMd.copyWith(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
+        // 2. Dynamic Geofence Radius Slider Widget
+        GeofenceSliderWidget(
+          formation: formation,
+          onRadiusChanged: (val) => packNotifier.updateGeofenceRadius(val),
+        ),
+        const SizedBox(height: 20),
+
+        // 3. Live Pack Roster Section Header
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Riders in Pack',
+              style: AppTypography.headlineMd.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
               ),
-              Text(
-                '${formation.members.length} members',
-                style: AppTypography.bodySm.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
+            ),
+            Text(
+              '${formation.members.length} members',
+              style: AppTypography.bodySm.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // 4. List of Convoy Participants
+        ...formation.members.map((member) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10.0),
+            child: PackRosterCard(
+              member: member,
+              onPing: () {
+                packNotifier.pingRider(member.id);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Spatial ping sent to ${member.callsign}'),
+                    backgroundColor: AppColors.primary,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+          );
+        }),
+        const SizedBox(height: 16),
+
+        // 5. High-Emphasis SOS Broadcast Section
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton.icon(
+            onPressed: () => _confirmSosBroadcast(context, packNotifier),
+            icon: const Icon(Icons.emergency, size: 22, color: Colors.white),
+            label: Text(
+              'BROADCAST PACK SOS (EMERGENCY)',
+              style: AppTypography.labelLg.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.alertCritical,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 4,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Center(
+          child: Text(
+            'Broadcasts instantaneous critical alert and GPS coordinates to all convoy units',
+            textAlign: TextAlign.center,
+            style: AppTypography.bodySm.copyWith(fontSize: 11, color: AppColors.textSecondary),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 6. Leave Convoy Room Action
+        Center(
+          child: TextButton.icon(
+            onPressed: () => _confirmLeavePack(context, packNotifier, formation.packCode),
+            icon: const Icon(Icons.exit_to_app, size: 16, color: AppColors.alertCritical),
+            label: Text(
+              'Leave Convoy Room (Return to Solo Mode)',
+              style: AppTypography.labelMd.copyWith(
+                color: AppColors.alertCritical,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Solo Mode View (Not in any pack room)
+  // ---------------------------------------------------------------------------
+  Widget _buildSoloView(BuildContext context, dynamic formation, PackNotifier packNotifier) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+      children: [
+        // Solo Status Hero Card
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderSubtle),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-
-          // 4. List of Convoy Participants
-          ...formation.members.map((member) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10.0),
-              child: PackRosterCard(
-                member: member,
-                onPing: () {
-                  packNotifier.pingRider(member.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Spatial ping sent to ${member.callsign}'),
-                      backgroundColor: AppColors.primary,
-                      duration: const Duration(seconds: 2),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryFixed.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                  );
-                },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.navigation, size: 12, color: AppColors.primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          'SOLO RIDER MODE',
+                          style: AppTypography.labelSm.copyWith(
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'GPS ACTIVE',
+                      style: AppTypography.labelSm.copyWith(
+                        color: AppColors.telemetryEmerald,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 9,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            );
-          }),
-          const SizedBox(height: 16),
-
-          // 5. High-Emphasis SOS Broadcast Section
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: () => _confirmSosBroadcast(context, packNotifier),
-              icon: const Icon(Icons.emergency, size: 22, color: Colors.white),
-              label: Text(
-                'BROADCAST PACK SOS (EMERGENCY)',
-                style: AppTypography.labelLg.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
+              const SizedBox(height: 14),
+              Text(
+                'Ride Independently or Join a Convoy',
+                style: AppTypography.headlineLg.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
                 ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.alertCritical,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                elevation: 4,
+              const SizedBox(height: 6),
+              Text(
+                'You are currently in solo mode. Your GPS breadcrumbs and trip metrics are tracked locally. Join or create a convoy room to share real-time spatial telemetry and geofence alerts with other riders.',
+                style: AppTypography.bodySm.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Center(
-            child: Text(
-              'Broadcasts instantaneous critical alert and GPS coordinates to all convoy units',
-              textAlign: TextAlign.center,
-              style: AppTypography.bodySm.copyWith(fontSize: 11, color: AppColors.textSecondary),
-            ),
-          ),
-          const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-          // 6. Disband Convoy Option (Leader action)
-          Center(
-            child: TextButton.icon(
-              onPressed: () => _confirmDisband(context, packNotifier),
-              icon: const Icon(Icons.close, size: 16, color: AppColors.textSecondary),
-              label: Text(
-                'Disband Active Formation',
-                style: AppTypography.labelMd.copyWith(color: AppColors.textSecondary),
+              // Action Buttons: Create Pack & Join Pack
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        packNotifier.createPack();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Created new Convoy Room! You are the Convoy Lead.'),
+                            backgroundColor: AppColors.primary,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add_circle_outline, size: 18, color: Colors.white),
+                      label: const Text('Create Convoy'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showJoinPackDialog(context, packNotifier),
+                      icon: const Icon(Icons.meeting_room, size: 18, color: AppColors.primary),
+                      label: const Text('Join Room'),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.primary),
+                        foregroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // Solo Roster (Just User)
+        Text(
+          'Active Pilot Status',
+          style: AppTypography.headlineMd.copyWith(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        if (formation.members.isNotEmpty)
+          PackRosterCard(
+            member: formation.members.first,
+            onPing: null,
+          ),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dialogs
+  // ---------------------------------------------------------------------------
+  void _confirmLeavePack(BuildContext context, PackNotifier notifier, String packCode) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.exit_to_app, color: AppColors.alertCritical),
+            const SizedBox(width: 8),
+            const Text('Leave Convoy Room?'),
+          ],
+        ),
+        content: Text(
+          'You will exit room "$packCode" and switch to Solo Ride Mode. Your pilot account, profile, and settings will remain fully active.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: AppTypography.labelMd.copyWith(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              notifier.leavePack();
+              Navigator.of(ctx).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Exited convoy room. Now in Solo Ride Mode.'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.alertCritical,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Leave Room'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showJoinPackDialog(BuildContext context, PackNotifier notifier) {
+    final controller = TextEditingController(text: 'GN-');
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.group_add, color: AppColors.primary),
+            const SizedBox(width: 8),
+            const Text('Join Convoy Room'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enter the 6-character convoy code shared by the convoy lead:',
+              style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              textCapitalization: TextCapitalization.characters,
+              style: AppTypography.telemetryNum.copyWith(
+                fontSize: 18,
+                letterSpacing: 1.5,
+                color: AppColors.primary,
+              ),
+              decoration: InputDecoration(
+                hintText: 'GN-9482',
+                filled: true,
+                fillColor: AppColors.surfaceContainerLow,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.borderSubtle),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                ),
               ),
             ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: AppTypography.labelMd.copyWith(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final code = controller.text.trim();
+              if (code.isNotEmpty && code != 'GN-') {
+                notifier.joinPack(code);
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Joined Convoy Room "$code"!'),
+                    backgroundColor: AppColors.primary,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Join'),
           ),
         ],
       ),
@@ -235,6 +560,7 @@ class PackManagementScreen extends ConsumerWidget {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
@@ -244,7 +570,7 @@ class PackManagementScreen extends ConsumerWidget {
           ],
         ),
         content: const Text(
-          'This will transmit a high-priority emergency packet to AWS IoT Core topic "groupnav/convoy/804/alerts" and trigger siren haptics on all connected convoy units.',
+          'This will transmit a high-priority emergency packet to AWS IoT Core topic "groupnav/convoy/alerts" and trigger siren haptics on all connected convoy units.',
         ),
         actions: [
           TextButton(
@@ -268,42 +594,6 @@ class PackManagementScreen extends ConsumerWidget {
               foregroundColor: Colors.white,
             ),
             child: const Text('Broadcast Now'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _confirmDisband(BuildContext context, PackNotifier notifier) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Disband Convoy?'),
-        content: const Text(
-          'Are you sure you want to disband this active convoy? Connected riders will be disconnected from the spatial sync mesh.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              notifier.disbandConvoy();
-              Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Convoy formation disbanded.'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.alertWarning,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Disband'),
           ),
         ],
       ),

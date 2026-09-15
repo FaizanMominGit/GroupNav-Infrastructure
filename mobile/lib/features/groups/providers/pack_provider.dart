@@ -91,10 +91,67 @@ class PackNotifier extends StateNotifier<PackFormation> {
     });
   }
 
-  void disbandConvoy() {
+  void leavePack() {
     state = state.copyWith(
+      isInPack: false,
+      packCode: '',
+      packId: '',
+      title: 'Solo Ride Mode',
       isTelemetrySyncActive: false,
-      members: state.members.where((m) => m.isLeader).toList(),
+      members: const [
+        PackMember(
+          id: 'apex-lead',
+          callsign: 'Apex (You)',
+          initials: 'AP',
+          status: PackMemberStatus.lead,
+          speedKmh: 0.0,
+          offsetMeters: 0.0,
+          offsetDescription: 'Solo Rider',
+          latencyMs: 5,
+          isLeader: true,
+        ),
+      ],
     );
+  }
+
+  void joinPack(String code) {
+    final cleanCode = code.trim().toUpperCase();
+    state = state.copyWith(
+      isInPack: true,
+      packCode: cleanCode,
+      packId: cleanCode.replaceAll('GN-', ''),
+      title: 'Pack Formation #$cleanCode',
+      isTelemetrySyncActive: true,
+      members: _defaultFormation().members,
+    );
+  }
+
+  void createPack() {
+    final randomNum = 1000 + (DateTime.now().millisecondsSinceEpoch % 9000);
+    final code = 'GN-$randomNum';
+    state = state.copyWith(
+      isInPack: true,
+      packCode: code,
+      packId: randomNum.toString(),
+      title: 'Pack Formation #$code',
+      isTelemetrySyncActive: true,
+      members: [
+        const PackMember(
+          id: 'apex-lead',
+          callsign: 'Apex (Lead)',
+          initials: 'AP',
+          status: PackMemberStatus.lead,
+          speedKmh: 0.0,
+          offsetMeters: 0.0,
+          offsetDescription: 'Convoy Lead',
+          latencyMs: 5,
+          isLeader: true,
+        ),
+      ],
+    );
+  }
+
+  void disbandConvoy() {
+    leavePack();
   }
 }

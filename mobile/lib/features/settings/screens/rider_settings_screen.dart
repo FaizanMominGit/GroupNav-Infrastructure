@@ -4,6 +4,7 @@ import '../../../core/config/client_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../groups/providers/pack_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/convoy_alerts_card.dart';
 import '../widgets/location_privacy_card.dart';
@@ -21,6 +22,8 @@ class RiderSettingsScreen extends ConsumerWidget {
     final authNotifier = ref.read(authNotifierProvider.notifier);
     final settings = ref.watch(settingsNotifierProvider);
     final settingsNotifier = ref.read(settingsNotifierProvider.notifier);
+    final packFormation = ref.watch(packNotifierProvider);
+    final packNotifier = ref.read(packNotifierProvider.notifier);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -155,6 +158,85 @@ class RiderSettingsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
 
+                  // Active Convoy Room Card (Decoupled from Auth)
+                  if (packFormation.isInPack) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'ACTIVE CONVOY ROOM',
+                                  style: AppTypography.labelSm.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 10,
+                                    letterSpacing: 0.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  packFormation.packCode,
+                                  style: AppTypography.headlineMd.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${packFormation.connectedCount} active riders in room',
+                                  style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              packNotifier.leavePack();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Exited convoy room. Switched to Solo Ride Mode.'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.exit_to_app, size: 14, color: AppColors.alertWarning),
+                            label: Text(
+                              'Leave Pack',
+                              style: AppTypography.labelSm.copyWith(
+                                color: AppColors.alertWarning,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: AppColors.alertWarning.withValues(alpha: 0.5)),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
                   // Section 2: Ride & Convoy Alerts
                   ConvoyAlertsCard(
                     settings: settings,
@@ -181,7 +263,7 @@ class RiderSettingsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 20),
 
-                  // Section 5: Destructive Action - Leave Pack / Log Out
+                  // Section 5: Account Level Action - Sign Out of Profile
                   Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
@@ -220,7 +302,7 @@ class RiderSettingsScreen extends ConsumerWidget {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                'Leave Pack / Log Out',
+                                'Log Out of Account',
                                 style: AppTypography.labelLg.copyWith(
                                   color: AppColors.alertCritical,
                                   fontWeight: FontWeight.w700,
@@ -234,7 +316,7 @@ class RiderSettingsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'You will remain logged in on this device until you sign out.',
+                    'Signing out removes your credentials and pilot profile from this device.',
                     style: AppTypography.bodySm.copyWith(
                       color: AppColors.textSecondary,
                       fontSize: 12,

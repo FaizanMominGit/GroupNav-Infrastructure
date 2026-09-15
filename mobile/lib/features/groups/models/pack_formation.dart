@@ -6,6 +6,7 @@ class PackFormation {
   final String title;
   final double geofenceRadiusMeters;
   final bool isTelemetrySyncActive;
+  final bool isInPack;
   final List<PackMember> members;
 
   const PackFormation({
@@ -14,6 +15,7 @@ class PackFormation {
     this.title = 'Pack Formation #804',
     this.geofenceRadiusMeters = 850.0,
     this.isTelemetrySyncActive = true,
+    this.isInPack = true,
     this.members = const [],
   });
 
@@ -33,6 +35,7 @@ class PackFormation {
     String? title,
     double? geofenceRadiusMeters,
     bool? isTelemetrySyncActive,
+    bool? isInPack,
     List<PackMember>? members,
   }) {
     return PackFormation(
@@ -41,6 +44,7 @@ class PackFormation {
       title: title ?? this.title,
       geofenceRadiusMeters: geofenceRadiusMeters ?? this.geofenceRadiusMeters,
       isTelemetrySyncActive: isTelemetrySyncActive ?? this.isTelemetrySyncActive,
+      isInPack: isInPack ?? this.isInPack,
       members: members ?? this.members,
     );
   }

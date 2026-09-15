@@ -144,8 +144,45 @@ void main() {
     test('disbandConvoy deactivates sync and retains only leader', () {
       packNotifier.disbandConvoy();
       expect(packNotifier.state.isTelemetrySyncActive, isFalse);
+      expect(packNotifier.state.isInPack, isFalse);
       expect(packNotifier.state.members.length, equals(1));
       expect(packNotifier.state.members.first.isLeader, isTrue);
+    });
+
+    test('leavePack sets isInPack to false and clears packCode', () {
+      expect(packNotifier.state.isInPack, isTrue);
+      packNotifier.leavePack();
+      expect(packNotifier.state.isInPack, isFalse);
+      expect(packNotifier.state.packCode, isEmpty);
+      expect(packNotifier.state.title, equals('Solo Ride Mode'));
+      expect(packNotifier.state.isTelemetrySyncActive, isFalse);
+      expect(packNotifier.state.members.length, equals(1));
+      expect(packNotifier.state.members.first.callsign, equals('Apex (You)'));
+    });
+
+    test('joinPack sets isInPack to true and updates packCode', () {
+      packNotifier.leavePack();
+      expect(packNotifier.state.isInPack, isFalse);
+
+      packNotifier.joinPack('GN-7721');
+      expect(packNotifier.state.isInPack, isTrue);
+      expect(packNotifier.state.packCode, equals('GN-7721'));
+      expect(packNotifier.state.title, equals('Pack Formation #GN-7721'));
+      expect(packNotifier.state.isTelemetrySyncActive, isTrue);
+      expect(packNotifier.state.members.length, equals(4));
+    });
+
+    test('createPack generates a new room and assigns user as Convoy Lead', () {
+      packNotifier.leavePack();
+      expect(packNotifier.state.isInPack, isFalse);
+
+      packNotifier.createPack();
+      expect(packNotifier.state.isInPack, isTrue);
+      expect(packNotifier.state.packCode, startsWith('GN-'));
+      expect(packNotifier.state.isTelemetrySyncActive, isTrue);
+      expect(packNotifier.state.members.length, equals(1));
+      expect(packNotifier.state.members.first.isLeader, isTrue);
+      expect(packNotifier.state.members.first.offsetDescription, equals('Convoy Lead'));
     });
   });
 }

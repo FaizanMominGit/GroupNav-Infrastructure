@@ -109,10 +109,13 @@ class ProfileSummaryCard extends StatelessWidget {
                       style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      pilot.phoneOrEmail,
-                      style: AppTypography.bodySm.copyWith(
-                        color: AppColors.textSecondary,
+                    Flexible(
+                      child: Text(
+                        pilot.phoneOrEmail,
+                        style: AppTypography.bodySm.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],

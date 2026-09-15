@@ -133,16 +133,16 @@ class RecordedConvoysCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 6),
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           _buildTripMetaBadge(Icons.route, '${trip.distanceKm} km'),
-                          const SizedBox(width: 10),
                           _buildTripMetaBadge(Icons.timer_outlined, trip.formattedDuration),
-                          const SizedBox(width: 10),
                           _buildTripMetaBadge(Icons.group_outlined, '${trip.packRidersCount} Riders'),
-                          const Spacer(),
                           Text(
-                            dateFormat.format(trip.date),
+                            '• ${dateFormat.format(trip.date)}',
                             style: AppTypography.bodySm.copyWith(
                               fontSize: 10,
                               color: AppColors.textSecondary,

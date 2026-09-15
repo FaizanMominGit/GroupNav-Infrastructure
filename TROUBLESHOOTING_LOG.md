@@ -353,3 +353,41 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 - **Prevention Rule**:
   Never use unconstrained `Row` children inside compact mobile cards. Always wrap variable-width text in `Expanded` or `Flexible`, and wrap multi-button action bars in `Wrap`.
 
+---
+
+### [ISSUE-018] Runtime RenderFlex Overflows Across Auth, Trips, and App Bar on 360dp Device
+- **Date & Phase**: 2026-09-15 | UI Polish & Mobile Device Verification
+- **Component / Command**: Physical device live run (Process ID 20880, `RMX3997` 360dp width)
+- **Symptom / Error Message**:
+  ```
+  Another exception was thrown: A RenderFlex overflowed by 17 pixels on the right.
+  Another exception was thrown: A RenderFlex overflowed by 1.8 pixels on the right.
+  Another exception was thrown: A RenderFlex overflowed by 61 pixels on the right.
+  Another exception was thrown: A RenderFlex overflowed by 39 pixels on the right.
+  Another exception was thrown: A RenderFlex overflowed by 122 pixels on the right.
+  Another exception was thrown: A RenderFlex overflowed by 28 pixels on the right.
+  Another exception was thrown: A RenderFlex overflowed by 31 pixels on the right.
+  ```
+- **Root Cause Analysis**:
+  1. **122px Overflow (`trip_history_screen.dart`)**: Header `Column` holding long subtitle `"Aurora PostGIS spatial ledger & LiDAR profiles"` was placed in a `Row` alongside a session count container without `Expanded`, exceeding 360dp viewport width by 122px.
+  2. **61px Overflow (`elevation_pace_chart_card.dart`)**: Cursor live value strip used `Row(mainAxisAlignment: MainAxisAlignment.spaceBetween)` holding `"Cursor Position:"` (~90px) and 3 formatted telemetry metrics (`"${distance} km • ${elevation} m • ${speed} km/h"`, ~240px) inside a 288dp card body.
+  3. **39px & 28px Overflows (`vehicle_class_selector.dart`)**: Each 2-column grid item has ~112dp inner width; `Row` contained fixed icon (18dp), `Spacer()`, and unconstrained label text which pushed beyond the boundary when selected with checkmark (16dp).
+  4. **31px Overflow (`otp_verification_dialog.dart`)**: 6 input fields with fixed `width: 44` (`6 * 44 = 264dp` plus gaps) inside a dialog container with 48dp total padding on 360dp width (`360 - 80 - 48 = 232dp` available).
+  5. **17px Overflow (`top_app_bar_pill.dart`)**: Left moniker `Row` (Menu icon + `"GroupNav"` + `"DePIN"` pill) and right reward pill (`"+4.2 NAV/hr"`) lacked `Expanded`/`Flexible` constraints.
+  6. **1.8px Overflow (`auth_onboarding_screen.dart`)**: Top card badges (`"SECURE ACCESS"` + `"AWS Cognito Connected"`) in a rigid `Row` slightly exceeded 272dp available inner card width.
+- **Fix / Solution Applied**:
+  1. `trip_history_screen.dart`: Wrapped header column in `Expanded` and gave subtitle `maxLines: 1, overflow: TextOverflow.ellipsis`.
+  2. `elevation_pace_chart_card.dart`: Replaced rigid `Row` in cursor value strip with responsive `Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 4)`.
+  3. `vehicle_class_selector.dart`: Replaced `Text(...) + Spacer()` with `Expanded(child: Text(..., maxLines: 1, overflow: TextOverflow.ellipsis))` and inline checkmark.
+  4. `otp_verification_dialog.dart`: Replaced fixed `SizedBox(width: 44)` with `Expanded(child: Container(margin: EdgeInsets.only(right: index < 5 ? 6 : 0), ...))`.
+  5. `top_app_bar_pill.dart`: Wrapped left branding `Row` in `Expanded` with `Flexible(child: Text(title, overflow: TextOverflow.ellipsis))`.
+  6. `auth_onboarding_screen.dart`: Wrapped badge rows in responsive `Wrap` with `WrapAlignment.spaceBetween`, and protected callsign and banner rows with `Expanded`/`Flexible`.
+  7. `trip_replay_map.dart`: Added `right: 12`, `Align(alignment: Alignment.centerLeft)`, and `Flexible` with ellipsis to floating tag.
+  8. `navigation_display_card.dart`: Wrapped segment labels in `FittedBox(fit: BoxFit.scaleDown)` to ensure clean rendering under any text scale.
+- **Verification**:
+  - `flutter analyze`: 0 issues found.
+  - `flutter test`: 46/46 unit tests passing.
+- **Prevention Rule**:
+  Always use `Expanded`, `Flexible`, `FittedBox`, or `Wrap` on horizontal containers that display text or dynamic metrics. Never place rigid unconstrained items inside mobile `Row` layouts.
+
+

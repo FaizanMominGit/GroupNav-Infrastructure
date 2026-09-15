@@ -85,16 +85,21 @@ class VehicleClassSelector extends StatelessWidget {
                       color: isSelected ? Colors.white : AppColors.onSurfaceVariant,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      item['label'] as String,
-                      style: AppTypography.labelSm.copyWith(
-                        color: isSelected ? Colors.white : AppColors.onSurfaceVariant,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        item['label'] as String,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.labelSm.copyWith(
+                          color: isSelected ? Colors.white : AppColors.onSurfaceVariant,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        ),
                       ),
                     ),
-                    const Spacer(),
-                    if (isSelected)
+                    if (isSelected) ...[
+                      const SizedBox(width: 4),
                       const Icon(Icons.check, size: 16, color: Colors.white),
+                    ],
                   ],
                 ),
               ),

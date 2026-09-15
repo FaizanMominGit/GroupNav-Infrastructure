@@ -43,40 +43,46 @@ class TopAppBarPill extends StatelessWidget implements PreferredSizeWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               // Left: Brand Moniker & Menu
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.menu, size: 20, color: AppColors.onSurfaceVariant),
-                    splashRadius: 18,
-                    onPressed: onMenuPressed,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    title,
-                    style: AppTypography.headlineMd.copyWith(
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
+              Expanded(
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.menu, size: 20, color: AppColors.onSurfaceVariant),
+                      splashRadius: 18,
+                      onPressed: onMenuPressed,
                     ),
-                  ),
-                  if (subtitle != null) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryFixed.withValues(alpha: 0.5),
-                        borderRadius: AppTheme.radiusSm,
-                      ),
+                    const SizedBox(width: 4),
+                    Flexible(
                       child: Text(
-                        subtitle!,
-                        style: AppTypography.labelSm.copyWith(
-                          color: AppColors.primaryDark,
-                          fontWeight: FontWeight.w800,
+                        title,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.headlineMd.copyWith(
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.5,
                         ),
                       ),
                     ),
+                    if (subtitle != null) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryFixed.withValues(alpha: 0.5),
+                          borderRadius: AppTheme.radiusSm,
+                        ),
+                        child: Text(
+                          subtitle!,
+                          style: AppTypography.labelSm.copyWith(
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
+              const SizedBox(width: 8),
 
               // Right: Live Telemetry Node Ping & Reward Ticker
               Row(

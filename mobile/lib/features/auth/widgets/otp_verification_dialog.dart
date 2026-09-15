@@ -130,39 +130,40 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
 
             // 6-Digit Split Input Grid
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(6, (index) {
-                return SizedBox(
-                  width: 44,
-                  height: 52,
-                  child: TextFormField(
-                    controller: _controllers[index],
-                    focusNode: _focusNodes[index],
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    maxLength: 1,
-                    style: AppTypography.telemetryNum.copyWith(
-                      color: AppColors.primary,
-                      fontSize: 20,
-                    ),
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: InputDecoration(
-                      counterText: '',
-                      filled: true,
-                      fillColor: _controllers[index].text.isNotEmpty
-                          ? AppColors.primaryFixed.withValues(alpha: 0.25)
-                          : AppColors.surfaceContainerLow,
-                      contentPadding: EdgeInsets.zero,
-                      border: OutlineInputBorder(
-                        borderRadius: AppTheme.radiusMd,
-                        borderSide: const BorderSide(color: AppColors.borderSubtle),
+                return Expanded(
+                  child: Container(
+                    height: 52,
+                    margin: EdgeInsets.only(right: index < 5 ? 6 : 0),
+                    child: TextFormField(
+                      controller: _controllers[index],
+                      focusNode: _focusNodes[index],
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      maxLength: 1,
+                      style: AppTypography.telemetryNum.copyWith(
+                        color: AppColors.primary,
+                        fontSize: 20,
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: AppTheme.radiusMd,
-                        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        counterText: '',
+                        filled: true,
+                        fillColor: _controllers[index].text.isNotEmpty
+                            ? AppColors.primaryFixed.withValues(alpha: 0.25)
+                            : AppColors.surfaceContainerLow,
+                        contentPadding: EdgeInsets.zero,
+                        border: OutlineInputBorder(
+                          borderRadius: AppTheme.radiusMd,
+                          borderSide: const BorderSide(color: AppColors.borderSubtle),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: AppTheme.radiusMd,
+                          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                        ),
                       ),
+                      onChanged: (val) => _onDigitChanged(index, val),
                     ),
-                    onChanged: (val) => _onDigitChanged(index, val),
                   ),
                 );
               }),

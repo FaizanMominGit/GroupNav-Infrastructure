@@ -73,9 +73,21 @@ This milestone executed two primary directives:
     - Right: Status badge (`Leader`, `With Pack`, `Lagging +790m`) or `Ping` action button.
   - Eliminated nested unconstrained horizontal badge chains that caused RenderFlex overflows.
 
-### 2.5 Trip History Screen Optimizations (`trip_history_analytics_trips/code.html`)
-- **Recorded Convoys Card (`RecordedConvoysCard`)**:
-  - Wrapped export action buttons (`GPX` and `GeoJSON`) in a responsive `Wrap` container with `WrapAlignment.spaceBetween`, preventing horizontal overflow on 360dp screens.
+### 2.5 Comprehensive 360dp Viewport RenderFlex Overflows Resolution
+- **Trip History Screen (`trip_history_screen.dart`)**:
+  - Wrapped header `Column` in `Expanded` and added `TextOverflow.ellipsis` to `"Aurora PostGIS spatial ledger & LiDAR profiles"`, fixing a 122px overflow.
+- **Elevation & Pace Chart Card (`elevation_pace_chart_card.dart`)**:
+  - Replaced rigid `Row` in the live cursor value readout with responsive `Wrap(alignment: WrapAlignment.spaceBetween, spacing: 8, runSpacing: 4)`, fixing a 61px overflow.
+  - Wrapped header title in `Expanded` with `TextOverflow.ellipsis`.
+- **Auth Screen & Widgets (`auth_onboarding_screen.dart`, `vehicle_class_selector.dart`, `otp_verification_dialog.dart`)**:
+  - `auth_onboarding_screen.dart`: Converted status badges, callsign headers, and telemetry reward pool rows to responsive `Wrap` and `Expanded` layouts, eliminating a 1.8px badge overflow and preventing font-scaling clipping.
+  - `vehicle_class_selector.dart`: Replaced unconstrained label and `Spacer()` in 2-column GridView with `Expanded(child: Text(..., maxLines: 1, overflow: TextOverflow.ellipsis))` and inline checkmark, resolving 39px and 28px overflows.
+  - `otp_verification_dialog.dart`: Replaced rigid `SizedBox(width: 44)` with `Expanded(child: Container(margin: EdgeInsets.only(right: 6), ...))` so the 6 OTP input digits scale responsively to fit any dialog width, resolving a 31px overflow.
+- **Top App Bar (`top_app_bar_pill.dart`)**:
+  - Wrapped left branding container in `Expanded` and brand title in `Flexible(child: Text(..., overflow: TextOverflow.ellipsis))`, eliminating a 17px overflow.
+- **Recorded Convoys & Navigation Settings (`recorded_convoys_card.dart`, `navigation_display_card.dart`)**:
+  - Wrapped card headers in `Expanded(child: Text(..., overflow: TextOverflow.ellipsis))`.
+  - Wrapped segmented buttons in `FittedBox(fit: BoxFit.scaleDown)` to guarantee label scaling without line wrapping.
 
 ---
 
@@ -83,7 +95,7 @@ This milestone executed two primary directives:
 
 1. **User Experience & Separation of Concerns**: End-users (motorcycle pilots, convoy leads) require glanceable, safety-critical navigation and communication during group rides. Raw CloudWatch throughput and JSON terminal logs clutter the driver UI; removing `/telemetry` keeps the interface clean while Amazon CloudWatch dashboards handle devops monitoring independently.
 2. **Safety & Glanceability**: The 3-metric bento strip (`Speed`, `Heading`, `Pack Status`) and Quick Status buttons (`Regroup`, `Refuel`, `Issue`) are instantly legible at highway speeds with minimal cognitive load.
-3. **Viewport Constraints (360dp / Android API 36)**: Real-world devices like the user's `RMX3997` operate at 360dp logical width. Fixed-width horizontal rows break easily; using `Expanded` on primary content and `Wrap` on secondary actions guarantees zero RenderFlex overflows regardless of font scaling.
+3. **Viewport Constraints (360dp / Android API 36)**: Real-world devices like the user's `RMX3997` operate at 360dp logical width. Fixed-width horizontal rows break easily; using `Expanded` on primary content, `Wrap` on secondary actions, and `FittedBox` on fixed-width segment buttons guarantees zero RenderFlex overflows regardless of font scaling.
 
 ---
 
@@ -101,4 +113,5 @@ This milestone executed two primary directives:
   ```powershell
   C:\flutter\bin\flutter.bat analyze
   ```
-- Result: **`No issues found! (ran in 22.5s)`**.
+- Result: **`No issues found!`**.
+

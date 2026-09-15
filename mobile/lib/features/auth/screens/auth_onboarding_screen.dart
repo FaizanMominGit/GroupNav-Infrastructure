@@ -84,8 +84,11 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 // Status Badges
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                Wrap(
+                                  alignment: WrapAlignment.spaceBetween,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  spacing: 8,
+                                  runSpacing: 6,
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -109,6 +112,7 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                       ),
                                     ),
                                     Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Container(
                                           width: 7,
@@ -167,8 +171,21 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text('Tactical Callsign', style: AppTypography.labelMd),
-                                    Text('Pre-assigned mesh tag', style: AppTypography.labelSm.copyWith(color: AppColors.primary)),
+                                    Flexible(
+                                      child: Text(
+                                        'Tactical Callsign',
+                                        style: AppTypography.labelMd,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        'Pre-assigned mesh tag',
+                                        style: AppTypography.labelSm.copyWith(color: AppColors.primary),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                                   ],
                                 ),
                                 const SizedBox(height: 6),
@@ -251,21 +268,30 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          width: 26,
-                                          height: 26,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary.withValues(alpha: 0.1),
-                                            shape: BoxShape.circle,
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 26,
+                                            height: 26,
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary.withValues(alpha: 0.1),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(Icons.tune, size: 15, color: AppColors.primary),
                                           ),
-                                          child: const Icon(Icons.tune, size: 15, color: AppColors.primary),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text('Identity Setup Flow', style: AppTypography.labelLg),
-                                      ],
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Identity Setup Flow',
+                                              style: AppTypography.labelLg,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
+                                    const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
@@ -318,13 +344,22 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.toll, size: 20, color: AppColors.secondary),
-                                    const SizedBox(width: 8),
-                                    Text('Convoy Reward Pool', style: AppTypography.labelSm),
-                                  ],
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.toll, size: 20, color: AppColors.secondary),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Convoy Reward Pool',
+                                          style: AppTypography.labelSm,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
+                                const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(

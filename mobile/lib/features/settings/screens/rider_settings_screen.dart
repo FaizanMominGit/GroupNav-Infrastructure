@@ -46,31 +46,37 @@ class RiderSettingsScreen extends ConsumerWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: const BoxDecoration(
-                          color: AppColors.surfaceContainerLow,
-                          shape: BoxShape.circle,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: const BoxDecoration(
+                            color: AppColors.surfaceContainerLow,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.menu,
+                            color: AppColors.textPrimary,
+                            size: 20,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.menu,
-                          color: AppColors.textPrimary,
-                          size: 20,
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            'GroupNav',
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.headlineMd.copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 18,
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'GroupNav',
-                        style: AppTypography.headlineMd.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 18,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
 
                   // Active Pilot Thumbnail & Status Pill
                   Container(
@@ -97,6 +103,8 @@ class RiderSettingsScreen extends ConsumerWidget {
                             ),
                             Text(
                               settings.callsign,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: AppTypography.labelMd.copyWith(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.w700,

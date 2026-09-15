@@ -35,9 +35,10 @@ class ConvoyBottomNavBar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(0, Icons.navigation_outlined, Icons.navigation, 'Convoy'),
-              _buildNavItem(1, Icons.group_outlined, Icons.group, 'Radar'),
+              _buildNavItem(1, Icons.radar_outlined, Icons.radar, 'Radar'),
               _buildNavItem(2, Icons.history_outlined, Icons.history, 'Trips'),
-              _buildNavItem(3, Icons.settings_outlined, Icons.settings, 'Settings'),
+              _buildNavItem(3, Icons.monitor_heart_outlined, Icons.monitor_heart, 'Ops'),
+              _buildNavItem(4, Icons.settings_outlined, Icons.settings, 'Settings'),
             ],
           ),
         ),

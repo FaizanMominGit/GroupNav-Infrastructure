@@ -487,7 +487,8 @@ flowchart TD
   - [x] Render synchronized SVG elevation area chart (0m–850m) overlaid with speed polyline.
   - [x] Fetch recorded trips from Aurora PostgreSQL PostGIS backend.
   - [x] Wire GPX and GeoJSON trip export handlers.
-- [ ] **Phase 7: Observability Screen (`/telemetry`)**
-  - [ ] Build 2x2 operational metrics grid (Lambda, Redis, DLQ, MQTT Ingest).
-  - [ ] Build dark developer terminal window streaming real-time MQTT JSON records.
-  - [ ] Add direct launch link to the AWS CloudWatch Dashboard.
+- [x] **Phase 7: Observability Screen (`/telemetry`)**
+  - [x] Build 2x2 operational metrics grid (Lambda, Redis, DLQ, MQTT Ingest).
+  - [x] Build dark developer terminal window streaming real-time MQTT JSON records.
+  - [x] Add direct launch link to the AWS CloudWatch Dashboard.
+

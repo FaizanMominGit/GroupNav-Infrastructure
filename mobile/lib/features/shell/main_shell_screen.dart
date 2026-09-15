@@ -6,6 +6,7 @@ import '../../core/widgets/bottom_nav_bar.dart';
 import '../auth/providers/auth_provider.dart';
 import '../auth/screens/auth_onboarding_screen.dart';
 import '../groups/screens/pack_management_screen.dart';
+import '../observability/screens/pipeline_health_screen.dart';
 import '../radar/screens/live_radar_screen.dart';
 import '../settings/screens/rider_settings_screen.dart';
 import '../trips/screens/trip_history_screen.dart';
@@ -45,6 +46,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           ),
           const LiveRadarScreen(),
           const TripHistoryScreen(),
+          const PipelineHealthScreen(),
           RiderSettingsScreen(config: widget.config),
         ],
       ),

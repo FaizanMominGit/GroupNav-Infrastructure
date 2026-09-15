@@ -390,4 +390,42 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 - **Prevention Rule**:
   Always use `Expanded`, `Flexible`, `FittedBox`, or `Wrap` on horizontal containers that display text or dynamic metrics. Never place rigid unconstrained items inside mobile `Row` layouts.
 
+---
+
+### [ISSUE-019] Pack Room vs. Pilot Identity Conflation ("Leave Pack" vs "Sign Out")
+- **Date & Phase**: 2026-09-15 | Functional Overhaul (Step 1)
+- **Component / Command**: `pack_provider.dart`, `rider_settings_screen.dart`, `pack_management_screen.dart`
+- **Symptom / Unexpected Behavior**:
+  The UI conflated exiting a temporary convoy room with logging out of the rider's AWS Cognito user account. When leaving a pack, user credentials were treated as coupled to the room, preventing solo riding and requiring re-authentication.
+- **Root Cause Analysis**:
+  A pack is an ephemeral rendezvous session (like a Discord channel or WebRTC room), whereas a rider's identity is a permanent AWS Cognito User Pool identity with persistent profile metrics. Coupling them violated the decoupled architecture principle.
+- **Fix / Solution Applied**:
+  1. Added `isInPack: bool` flag to `PackFormation` model.
+  2. Created dedicated `leavePack()` in `PackNotifier` that sets `isInPack = false` and switches to Solo Ride Mode without modifying Cognito tokens or stored AWS credentials.
+  3. Added Active Convoy Room management card in `RiderSettingsScreen` with dedicated "Leave Pack" button, while isolating "Log Out of Account" into a separate destructive sign-out dialog.
+  4. Added `_buildSoloView` and `_buildInPackView` to `PackManagementScreen` allowing solo riders to independently record trips or create/join convoy rooms.
+- **Verification**:
+  Unit tests in `mobile/test/pack_test.dart` and `mobile/test/settings_test.dart` verified that `leavePack()` retains pilot identity while switching room states.
+- **Prevention Rule**:
+  Always keep session/room membership decoupled from user authentication and persistent credentials.
+
+---
+
+### [ISSUE-020] StateNotifier State Getter Access Outside Class Hierarchy in Provider Definition
+- **Date & Phase**: 2026-09-15 | Functional Overhaul (Step 5)
+- **Component / Command**: `flutter analyze` / `trip_history_provider.dart`
+- **Symptom / Error Message**:
+  ```
+  warning - The member 'state' can only be used within 'package:state_notifier/state_notifier.dart' or a test - lib\features\trips\providers\trip_history_provider.dart:444:18 - invalid_use_of_visible_for_testing_member
+  warning - The member 'state' can only be used within instance members of subclasses of 'StateNotifier' - lib\features\trips\providers\trip_history_provider.dart:444:18 - invalid_use_of_protected_member
+  ```
+- **Root Cause Analysis**:
+  `StateNotifier.state` is protected and strictly intended for read/write within subclasses of `StateNotifier`. Referencing `notifier.state` inside the external `Provider` callback violates encapsulation and triggers Riverpod analysis lints.
+- **Fix / Solution Applied**:
+  Injected `LocationService` into the `TripHistoryNotifier` constructor (`TripHistoryNotifier({this.locationService})`). The notifier manages its own `_locationSub` internally and accesses `state.isRecording` within its own instance methods.
+- **Verification**:
+  `flutter analyze` succeeded with 0 warnings or issues.
+- **Prevention Rule**:
+  Never inspect or mutate `notifier.state` outside of the `StateNotifier` class declaration. Pass external dependencies into the constructor and manage reactive subscriptions internally.
+
 

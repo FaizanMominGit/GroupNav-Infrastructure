@@ -285,8 +285,20 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 - **Prevention Rule**:
   Use `activeThumbColor` when styling custom Material 3 toggle switches.
 
+---
 
-
-
-
-
+### [ISSUE-015] Missing Flutter SDK on Single-Drive (C:) Developer Workstations
+- **Date & Phase**: 2026-09-15 | UI Phase 4 (Pack Management & Formation Screen)
+- **Component / Command**: `flutter test` / `flutter --version`
+- **Symptom / Error Message**:
+  ```
+  flutter : The term 'flutter' is not recognized as the name of a cmdlet, function, script file, or operable program.
+  ```
+- **Root Cause Analysis**:
+  Earlier milestones (UI 1–3) were executed on a secondary development machine with Flutter hosted at `D:\flutter`. The active workstation has a single primary disk volume (`C:\`) and lacked the Flutter binary directory in `$env:Path`.
+- **Fix / Solution Applied**:
+  Cloned the official Flutter stable release (`--depth 1 -b stable`) into `C:\flutter`. Initialized the Flutter Dart toolchain and persisted `C:\flutter\bin` to the Windows User Environment `Path` registry.
+- **Verification**:
+  `flutter --version` verified working and active in terminal sessions.
+- **Prevention Rule**:
+  Always verify the local volume topology and install developer SDKs to `C:\flutter` if secondary drives are not present.

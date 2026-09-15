@@ -457,26 +457,26 @@ flowchart TD
 
 ## 12. Complete UI Implementation Checklist
 
-- [ ] **Phase 1: Foundation & Setup**
-  - [ ] Bundle and test loading of [`client-config.json`](file:///d:/chirag/GroupNav-Infrastructure/client-config.json).
-  - [ ] Implement design system tokens (`colors`, `typography`, `elevation`, `spacing`) from [`groupnav_template.md`](file:///d:/chirag/GroupNav-Infrastructure/groupnav_template.md).
-  - [ ] Build shared shell components (`TopAppBar`, `BottomNavBar` with active state routing).
-- [ ] **Phase 2: Authentication Screen (`/auth`)**
-  - [ ] Implement phone/email input and callsign form fields with validation.
-  - [ ] Implement vehicle class selector (Sportbike, Adventure, Touring, Cruiser) and beacon color swatches.
-  - [ ] Implement 6-digit OTP verification modal with resend countdown timer.
-  - [ ] Wire Amazon Cognito User Pool + Identity Pool exchange; persist temporary credentials in device keystore.
-- [ ] **Phase 3: Live Radar Screen (`/radar`)**
-  - [ ] Initialize MapLibre GL map with Amazon Location Service `GroupNavMap` vector style.
-  - [ ] Render 800m circular dashed geofence boundary mesh and glowing navigation polyline.
-  - [ ] Render animated leader marker and peer rider offset chips.
-  - [ ] Build 4-card HUD bottom sheet (Speed, Heading, Elevation, Pack Cohesion).
-  - [ ] Integrate AWS IoT Core WebSocket client with SigV4 signing; wire broadcast toggle switch (QoS 1).
-- [ ] **Phase 4: Pack Management Screen (`/groups`)**
-  - [ ] Render active pack formation header and group code box (`GN-9482`) with copy action.
-  - [ ] Build QR code pairing modal for in-person mesh rendezvous.
-  - [ ] Implement geofence radius slider (200m to 5,000m) connected to Amazon Location Service geofence collection.
-  - [ ] Build roster cards showing member relative offsets, speeds, and ping alerts.
+- [x] **Phase 1: Foundation & Setup**
+  - [x] Bundle and test loading of [`client-config.json`](file:///d:/chirag/GroupNav-Infrastructure/client-config.json).
+  - [x] Implement design system tokens (`colors`, `typography`, `elevation`, `spacing`) from [`groupnav_template.md`](file:///d:/chirag/GroupNav-Infrastructure/groupnav_template.md).
+  - [x] Build shared shell components (`TopAppBar`, `BottomNavBar` with active state routing).
+- [x] **Phase 2: Authentication Screen (`/auth`)**
+  - [x] Implement phone/email input and callsign form fields with validation.
+  - [x] Implement vehicle class selector (Sportbike, Adventure, Touring, Cruiser) and beacon color swatches.
+  - [x] Implement 6-digit OTP verification modal with resend countdown timer.
+  - [x] Wire Amazon Cognito User Pool + Identity Pool exchange; persist temporary credentials in device keystore.
+- [x] **Phase 3: Live Radar Screen (`/radar`)**
+  - [x] Initialize MapLibre GL map with Amazon Location Service `GroupNavMap` vector style.
+  - [x] Render 800m circular dashed geofence boundary mesh and glowing navigation polyline.
+  - [x] Render animated leader marker and peer rider offset chips.
+  - [x] Build 4-card HUD bottom sheet (Speed, Heading, Elevation, Pack Cohesion).
+  - [x] Integrate AWS IoT Core WebSocket client with SigV4 signing; wire broadcast toggle switch (QoS 1).
+- [x] **Phase 4: Pack Management Screen (`/groups`)**
+  - [x] Render active pack formation header and group code box (`GN-9482`) with copy action.
+  - [x] Build QR code pairing modal for in-person mesh rendezvous.
+  - [x] Implement geofence radius slider (200m to 5,000m) connected to Amazon Location Service geofence collection.
+  - [x] Build roster cards showing member relative offsets, speeds, and ping alerts.
 - [ ] **Phase 5: Rider Settings Screen (`/settings`)**
   - [ ] Implement GPS update frequency segmented control (1 Hz, 5 Hz, 10 Hz) tied to device location stream.
   - [ ] Implement unit switch (`km/h` vs `mph`) and map theme toggles.

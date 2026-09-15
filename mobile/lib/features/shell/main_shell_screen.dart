@@ -7,6 +7,7 @@ import '../../core/widgets/bottom_nav_bar.dart';
 import '../../core/widgets/top_app_bar_pill.dart';
 import '../auth/providers/auth_provider.dart';
 import '../auth/screens/auth_onboarding_screen.dart';
+import '../groups/screens/pack_management_screen.dart';
 import '../radar/screens/live_radar_screen.dart';
 
 class MainShellScreen extends ConsumerStatefulWidget {
@@ -34,7 +35,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: _currentTabIndex == 1
+      appBar: (_currentTabIndex == 0 || _currentTabIndex == 1)
           ? null
           : TopAppBarPill(
               title: 'GroupNav',
@@ -44,7 +45,13 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       body: IndexedStack(
         index: _currentTabIndex,
         children: [
-          _buildPlaceholderScreen('Pack Management', 'Active formation #804 & geofence setup', Icons.navigation),
+          PackManagementScreen(
+            onExpandMap: () {
+              setState(() {
+                _currentTabIndex = 1;
+              });
+            },
+          ),
           const LiveRadarScreen(),
           _buildPlaceholderScreen('Trip History', 'Aurora PostgreSQL PostGIS replay ledger', Icons.history),
           _buildSettingsScreen(pilot.callsign, pilot.vehicleClass, pilot.cognitoIdentityId),

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import '../../../core/services/location_service.dart';
+import '../../radar/providers/radar_provider.dart';
 import '../models/trip_record.dart';
 
 class TripPlaybackState {
@@ -11,6 +13,11 @@ class TripPlaybackState {
   final double playbackSpeed; // 1.0, 1.5, 2.0
   final LatLng activePosition;
   final ElevationPoint currentElevationPoint;
+  final bool isRecording;
+  final String? activeRecordingTitle;
+  final DateTime? recordingStartTime;
+  final List<LatLng> recordedCoordinates;
+  final List<ElevationPoint> recordedElevations;
 
   const TripPlaybackState({
     required this.availableTrips,
@@ -20,6 +27,11 @@ class TripPlaybackState {
     this.playbackSpeed = 1.0,
     required this.activePosition,
     required this.currentElevationPoint,
+    this.isRecording = false,
+    this.activeRecordingTitle,
+    this.recordingStartTime,
+    this.recordedCoordinates = const [],
+    this.recordedElevations = const [],
   });
 
   Duration get currentDuration {
@@ -43,6 +55,11 @@ class TripPlaybackState {
     double? playbackSpeed,
     LatLng? activePosition,
     ElevationPoint? currentElevationPoint,
+    bool? isRecording,
+    String? activeRecordingTitle,
+    DateTime? recordingStartTime,
+    List<LatLng>? recordedCoordinates,
+    List<ElevationPoint>? recordedElevations,
   }) {
     return TripPlaybackState(
       availableTrips: availableTrips ?? this.availableTrips,
@@ -52,16 +69,36 @@ class TripPlaybackState {
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       activePosition: activePosition ?? this.activePosition,
       currentElevationPoint: currentElevationPoint ?? this.currentElevationPoint,
+      isRecording: isRecording ?? this.isRecording,
+      activeRecordingTitle: activeRecordingTitle ?? this.activeRecordingTitle,
+      recordingStartTime: recordingStartTime ?? this.recordingStartTime,
+      recordedCoordinates: recordedCoordinates ?? this.recordedCoordinates,
+      recordedElevations: recordedElevations ?? this.recordedElevations,
     );
   }
 }
 
 class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
+  final LocationService? locationService;
   Timer? _playbackTimer;
+  StreamSubscription<PositionData>? _locationSub;
 
-  TripHistoryNotifier() : super(_initialState()) {
+  TripHistoryNotifier({this.locationService}) : super(_initialState()) {
     // Initial sync
     _updateInterpolatedState(0.0);
+    _listenToLocation();
+  }
+
+  void _listenToLocation() {
+    _locationSub = locationService?.positionStream.listen((pos) {
+      if (state.isRecording) {
+        addBreadcrumb(
+          LatLng(pos.latitude, pos.longitude),
+          pos.speedKmh,
+          pos.altitude,
+        );
+      }
+    });
   }
 
   static TripPlaybackState _initialState() {
@@ -76,6 +113,123 @@ class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
       activePosition: initialTrip.routeCoordinates.first,
       currentElevationPoint: initialTrip.elevationProfile.first,
     );
+  }
+
+  void startRecording({String? title}) {
+    state = state.copyWith(
+      isRecording: true,
+      activeRecordingTitle: title ?? 'Live Ride Session',
+      recordingStartTime: DateTime.now(),
+      recordedCoordinates: [],
+      recordedElevations: [],
+    );
+  }
+
+  void addBreadcrumb(LatLng pos, double speedKmh, double altitudeMeters) {
+    if (!state.isRecording) return;
+    final updatedCoords = List<LatLng>.from(state.recordedCoordinates)..add(pos);
+
+    // Calculate total distance so far
+    double totalDistKm = 0.0;
+    const distance = Distance();
+    for (int i = 0; i < updatedCoords.length - 1; i++) {
+      totalDistKm += distance.as(LengthUnit.Kilometer, updatedCoords[i], updatedCoords[i + 1]);
+    }
+
+    final newPoint = ElevationPoint(
+      distanceKm: double.parse(totalDistKm.toStringAsFixed(2)),
+      elevationMeters: altitudeMeters,
+      speedKmh: speedKmh,
+    );
+    final updatedElevations = List<ElevationPoint>.from(state.recordedElevations)..add(newPoint);
+
+    state = state.copyWith(
+      recordedCoordinates: updatedCoords,
+      recordedElevations: updatedElevations,
+    );
+  }
+
+  TripRecord? stopRecording() {
+    if (!state.isRecording || state.recordedCoordinates.isEmpty) {
+      state = state.copyWith(isRecording: false);
+      return null;
+    }
+
+    final now = DateTime.now();
+    final start = state.recordingStartTime ?? now.subtract(const Duration(minutes: 1));
+    final duration = now.difference(start);
+
+    // Compute total distance
+    double totalDistKm = 0.0;
+    const distance = Distance();
+    for (int i = 0; i < state.recordedCoordinates.length - 1; i++) {
+      totalDistKm += distance.as(
+        LengthUnit.Kilometer,
+        state.recordedCoordinates[i],
+        state.recordedCoordinates[i + 1],
+      );
+    }
+    if (totalDistKm == 0.0 && state.recordedCoordinates.length > 1) {
+      totalDistKm = 0.1;
+    }
+
+    // Compute speeds
+    double maxSpeed = 0.0;
+    double speedSum = 0.0;
+    for (final pt in state.recordedElevations) {
+      if (pt.speedKmh > maxSpeed) maxSpeed = pt.speedKmh;
+      speedSum += pt.speedKmh;
+    }
+    final avgSpeed = state.recordedElevations.isNotEmpty
+        ? speedSum / state.recordedElevations.length
+        : 0.0;
+
+    final waypoints = [
+      TripWaypoint(
+        position: state.recordedCoordinates.first,
+        title: 'Start Waypoint',
+        type: WaypointType.start,
+      ),
+      if (state.recordedCoordinates.length > 2)
+        TripWaypoint(
+          position: state.recordedCoordinates[state.recordedCoordinates.length ~/ 2],
+          title: 'Convoy Checkpoint',
+          type: WaypointType.checkpoint,
+        ),
+      TripWaypoint(
+        position: state.recordedCoordinates.last,
+        title: 'Finish Waypoint',
+        type: WaypointType.finish,
+      ),
+    ];
+
+    final newTrip = TripRecord(
+      id: 'trip-${now.millisecondsSinceEpoch}',
+      title: state.activeRecordingTitle ?? 'Recorded Convoy Run',
+      date: start,
+      distanceKm: double.parse(totalDistKm.toStringAsFixed(2)),
+      duration: duration,
+      maxSpeedKmh: double.parse(maxSpeed.toStringAsFixed(1)),
+      avgSpeedKmh: double.parse(avgSpeed.toStringAsFixed(1)),
+      totalClimbMeters: 120,
+      packRidersCount: 4,
+      routeCoordinates: state.recordedCoordinates,
+      waypoints: waypoints,
+      elevationProfile: state.recordedElevations,
+    );
+
+    final updatedList = [newTrip, ...state.availableTrips];
+
+    state = state.copyWith(
+      isRecording: false,
+      availableTrips: updatedList,
+      selectedTrip: newTrip,
+      progress: 0.0,
+      activePosition: newTrip.routeCoordinates.first,
+      currentElevationPoint: newTrip.elevationProfile.first,
+    );
+
+    return newTrip;
   }
 
   void selectTrip(TripRecord trip) {
@@ -166,6 +320,7 @@ class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
   @override
   void dispose() {
     _playbackTimer?.cancel();
+    _locationSub?.cancel();
     super.dispose();
   }
 
@@ -298,5 +453,6 @@ class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
 
 final tripHistoryNotifierProvider =
     StateNotifierProvider<TripHistoryNotifier, TripPlaybackState>((ref) {
-  return TripHistoryNotifier();
+  final locationService = ref.watch(locationServiceProvider);
+  return TripHistoryNotifier(locationService: locationService);
 });

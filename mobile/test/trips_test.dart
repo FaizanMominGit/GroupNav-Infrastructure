@@ -185,5 +185,50 @@ void main() {
       notifier.cyclePlaybackSpeed();
       expect(notifier.state.playbackSpeed, 1.0);
     });
+
+    test('Live recording accumulates breadcrumbs and finalizes into selectable TripRecord', () {
+      final notifier = TripHistoryNotifier();
+      final initialCount = notifier.state.availableTrips.length;
+
+      expect(notifier.state.isRecording, isFalse);
+
+      notifier.startRecording(title: 'Apex Skyline Test');
+      expect(notifier.state.isRecording, isTrue);
+      expect(notifier.state.activeRecordingTitle, equals('Apex Skyline Test'));
+      expect(notifier.state.recordedCoordinates, isEmpty);
+
+      // Add breadcrumbs along simulated ride
+      notifier.addBreadcrumb(const LatLng(37.7749, -122.4194), 45.0, 100.0);
+      notifier.addBreadcrumb(const LatLng(37.7780, -122.4150), 75.0, 150.0);
+      notifier.addBreadcrumb(const LatLng(37.7850, -122.4070), 85.0, 210.0);
+
+      expect(notifier.state.recordedCoordinates.length, equals(3));
+      expect(notifier.state.recordedElevations.length, equals(3));
+      expect(notifier.state.recordedElevations.last.distanceKm, greaterThan(0.5));
+
+      // Finalize and save
+      final savedTrip = notifier.stopRecording();
+      expect(savedTrip, isNotNull);
+      expect(savedTrip!.title, equals('Apex Skyline Test'));
+      expect(savedTrip.routeCoordinates.length, equals(3));
+      expect(savedTrip.maxSpeedKmh, equals(85.0));
+      expect(savedTrip.avgSpeedKmh, closeTo(68.3, 0.5));
+      expect(notifier.state.isRecording, isFalse);
+
+      // Verify prepended into availableTrips and active
+      expect(notifier.state.availableTrips.length, equals(initialCount + 1));
+      expect(notifier.state.selectedTrip.id, equals(savedTrip.id));
+      expect(notifier.state.selectedTrip.title, equals('Apex Skyline Test'));
+
+      // Verify exportability
+      final gpx = savedTrip.toGpx();
+      expect(gpx.contains('lat="37.774900"'), isTrue);
+      expect(gpx.contains('lat="37.785000"'), isTrue);
+
+      final geoJson = jsonDecode(savedTrip.toGeoJson()) as Map<String, dynamic>;
+      expect(geoJson['type'], equals('FeatureCollection'));
+      final feature = (geoJson['features'] as List).first as Map<String, dynamic>;
+      expect(feature['properties']['title'], equals('Apex Skyline Test'));
+    });
   });
 }

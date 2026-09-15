@@ -76,6 +76,114 @@ class TripHistoryScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
 
+            // Live Ride Recording Card
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: playbackState.isRecording
+                    ? AppColors.alertCritical.withOpacity(0.08)
+                    : AppColors.cardBg,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: playbackState.isRecording
+                      ? AppColors.alertCritical.withOpacity(0.5)
+                      : AppColors.borderSubtle,
+                  width: playbackState.isRecording ? 1.5 : 1.0,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: playbackState.isRecording
+                          ? AppColors.alertCritical
+                          : AppColors.primaryFixed.withOpacity(0.3),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      playbackState.isRecording ? Icons.fiber_manual_record : Icons.play_circle_outline,
+                      color: playbackState.isRecording ? Colors.white : AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          playbackState.isRecording
+                              ? 'LIVE TRIP RECORDING'
+                              : 'Live GPS Track Recorder',
+                          style: AppTypography.labelMd.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: playbackState.isRecording
+                                ? AppColors.alertCritical
+                                : AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          playbackState.isRecording
+                              ? '${playbackState.recordedCoordinates.length} GPS fixes • ${playbackState.recordedElevations.isNotEmpty ? playbackState.recordedElevations.last.distanceKm : 0.0} km'
+                              : 'Capture real telemetry coordinates for PostGIS & GPX',
+                          style: AppTypography.bodySm.copyWith(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (playbackState.isRecording) {
+                        final saved = historyNotifier.stopRecording();
+                        if (saved != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Saved "${saved.title}" (${saved.distanceKm} km)! Ready for GPX export.'),
+                              backgroundColor: AppColors.primary,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      } else {
+                        historyNotifier.startRecording(title: 'Convoy Ride Session');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Live ride recording started! Tracking GPS breadcrumbs...'),
+                            backgroundColor: AppColors.primary,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: playbackState.isRecording
+                          ? AppColors.alertCritical
+                          : AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      playbackState.isRecording ? 'Save Ride' : 'Record',
+                      style: AppTypography.labelSm.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
             // 1. Interactive Replay Map
             TripReplayMap(
               trip: currentTrip,

@@ -7,12 +7,14 @@ class LocationPrivacyCard extends StatelessWidget {
   final RiderSettings settings;
   final ValueChanged<bool> onToggleShareLocation;
   final ValueChanged<GpsRate> onGpsRateChanged;
+  final ValueChanged<bool>? onToggleDemoSimulation;
 
   const LocationPrivacyCard({
     super.key,
     required this.settings,
     required this.onToggleShareLocation,
     required this.onGpsRateChanged,
+    this.onToggleDemoSimulation,
   });
 
   @override
@@ -132,6 +134,43 @@ class LocationPrivacyCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: AppColors.borderSubtle),
+          const SizedBox(height: 12),
+
+          // 3. Demo Route Simulation Toggle
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Demo Route Simulation',
+                      style: AppTypography.labelLg.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Replay Skyline Summit track (disable for real GPS hardware)',
+                      style: AppTypography.bodySm.copyWith(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Switch.adaptive(
+                value: settings.isDemoSimulation,
+                onChanged: onToggleDemoSimulation,
+                activeColor: AppColors.primary,
+              ),
+            ],
           ),
           const SizedBox(height: 10),
 

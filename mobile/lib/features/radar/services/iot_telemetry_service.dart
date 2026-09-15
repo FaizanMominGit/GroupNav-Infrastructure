@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:latlong2/latlong.dart';
 import '../../../core/config/client_config.dart';
+import '../../../core/services/location_service.dart';
 import '../models/convoy_peer.dart';
 import '../models/telemetry_packet.dart';
 
@@ -17,8 +18,10 @@ final List<LatLng> kSkylineSummitRoute = [
 
 class IotTelemetryService {
   final ClientConfig config;
+  final LocationService? locationService;
   bool _isBroadcasting = true;
   Timer? _telemetryTicker;
+  StreamSubscription<PositionData>? _locationSub;
 
   final _telemetryController = StreamController<List<ConvoyPeer>>.broadcast();
   Stream<List<ConvoyPeer>> get convoyStream => _telemetryController.stream;
@@ -30,17 +33,53 @@ class IotTelemetryService {
   final double _speedKmh = 78.0;
   final double _headingDeg = 42.0;
 
-  IotTelemetryService({required this.config}) {
-    startSimulation();
+  IotTelemetryService({
+    required this.config,
+    this.locationService,
+  }) {
+    startTelemetry();
   }
 
   void setBroadcasting(bool value) {
     _isBroadcasting = value;
     if (_isBroadcasting) {
-      startSimulation();
+      startTelemetry();
     } else {
       _telemetryTicker?.cancel();
+      _locationSub?.cancel();
     }
+  }
+
+  void startTelemetry() {
+    _telemetryTicker?.cancel();
+    _locationSub?.cancel();
+
+    if (locationService != null && locationService!.mode == LocationMode.hardware) {
+      _startHardwareLocationStreaming();
+    } else {
+      startSimulation();
+    }
+  }
+
+  void _startHardwareLocationStreaming() {
+    _locationSub = locationService!.positionStream.listen((pos) {
+      if (!_isBroadcasting) return;
+
+      final leader = ConvoyPeer(
+        callsign: 'Leader: Apex (You)',
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        altitude: pos.altitude,
+        speedKmh: pos.speedKmh,
+        headingDeg: pos.headingDeg,
+        relativeOffsetMeters: 0,
+        isLeader: true,
+        beaconColorHex: '#0066FF',
+        monikerTag: 'HQ',
+      );
+
+      _telemetryController.add([leader]);
+    });
   }
 
   void startSimulation() {
@@ -140,6 +179,7 @@ class IotTelemetryService {
 
   void dispose() {
     _telemetryTicker?.cancel();
+    _locationSub?.cancel();
     _telemetryController.close();
   }
 }

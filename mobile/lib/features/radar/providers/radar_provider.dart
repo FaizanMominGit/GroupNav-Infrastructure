@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
+import '../../../core/services/location_service.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../settings/models/rider_settings.dart';
+import '../../settings/providers/settings_provider.dart';
 import '../models/convoy_peer.dart';
 import '../services/iot_telemetry_service.dart';
 
@@ -78,9 +81,25 @@ class RadarState {
   }
 }
 
+final locationServiceProvider = Provider<LocationService>((ref) {
+  final settings = ref.watch(settingsNotifierProvider);
+  final initialMode = settings.isDemoSimulation ? LocationMode.simulation : LocationMode.hardware;
+  final service = LocationService(initialMode: initialMode);
+
+  ref.listen<RiderSettings>(settingsNotifierProvider, (previous, next) {
+    if (previous?.isDemoSimulation != next.isDemoSimulation) {
+      service.setMode(next.isDemoSimulation ? LocationMode.simulation : LocationMode.hardware);
+    }
+  });
+
+  ref.onDispose(() => service.dispose());
+  return service;
+});
+
 final iotTelemetryServiceProvider = Provider<IotTelemetryService>((ref) {
   final config = ref.watch(clientConfigProvider);
-  final service = IotTelemetryService(config: config);
+  final locationService = ref.watch(locationServiceProvider);
+  final service = IotTelemetryService(config: config, locationService: locationService);
   ref.onDispose(() => service.dispose());
   return service;
 });

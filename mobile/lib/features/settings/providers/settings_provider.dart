@@ -59,6 +59,10 @@ class SettingsNotifier extends StateNotifier<RiderSettings> {
   void toggleShareRealTimeLocation(bool value) {
     state = state.copyWith(shareRealTimeLocation: value);
   }
+
+  void toggleDemoSimulation(bool value) {
+    state = state.copyWith(isDemoSimulation: value);
+  }
 }
 
 final settingsNotifierProvider = StateNotifierProvider<SettingsNotifier, RiderSettings>((ref) {

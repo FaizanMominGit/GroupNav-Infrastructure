@@ -111,6 +111,7 @@ class RiderSettings {
   final bool keepScreenAwake;
   final bool shareRealTimeLocation;
   final bool cohesionPingAudio;
+  final bool isDemoSimulation;
   final double stakedBalanceNav;
   final double navRewardRate;
   final String walletAddress;
@@ -130,6 +131,7 @@ class RiderSettings {
     this.keepScreenAwake = true,
     this.shareRealTimeLocation = true,
     this.cohesionPingAudio = true,
+    this.isDemoSimulation = true,
     this.stakedBalanceNav = 142.8,
     this.navRewardRate = 4.2,
     this.walletAddress = '0x7F2C9B41...E9A3',
@@ -150,6 +152,7 @@ class RiderSettings {
     bool? keepScreenAwake,
     bool? shareRealTimeLocation,
     bool? cohesionPingAudio,
+    bool? isDemoSimulation,
     double? stakedBalanceNav,
     double? navRewardRate,
     String? walletAddress,
@@ -169,6 +172,7 @@ class RiderSettings {
       keepScreenAwake: keepScreenAwake ?? this.keepScreenAwake,
       shareRealTimeLocation: shareRealTimeLocation ?? this.shareRealTimeLocation,
       cohesionPingAudio: cohesionPingAudio ?? this.cohesionPingAudio,
+      isDemoSimulation: isDemoSimulation ?? this.isDemoSimulation,
       stakedBalanceNav: stakedBalanceNav ?? this.stakedBalanceNav,
       navRewardRate: navRewardRate ?? this.navRewardRate,
       walletAddress: walletAddress ?? this.walletAddress,

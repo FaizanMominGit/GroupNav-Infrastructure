@@ -260,6 +260,7 @@ class RiderSettingsScreen extends ConsumerWidget {
                     settings: settings,
                     onToggleShareLocation: settingsNotifier.toggleShareRealTimeLocation,
                     onGpsRateChanged: settingsNotifier.setGpsRate,
+                    onToggleDemoSimulation: settingsNotifier.toggleDemoSimulation,
                   ),
                   const SizedBox(height: 20),
 

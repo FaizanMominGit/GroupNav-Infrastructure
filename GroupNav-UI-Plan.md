@@ -482,11 +482,11 @@ flowchart TD
   - [x] Implement unit switch (`km/h` vs `mph`) and map theme toggles.
   - [x] Display active Cognito Identity ID and IAM Role ARN with copy button.
   - [x] Implement `Sign Out` flow terminating active MQTT sessions and clearing device credentials.
-- [ ] **Phase 6: Trip History & Analytics Screen (`/trips`)**
-  - [ ] Build interactive trip replay player with Play/Pause, scrubber, and 1.5x speed toggle.
-  - [ ] Render synchronized SVG elevation area chart (0m–850m) overlaid with speed polyline.
-  - [ ] Fetch recorded trips from Aurora PostgreSQL PostGIS backend.
-  - [ ] Wire GPX and GeoJSON trip export handlers.
+- [x] **Phase 6: Trip History & Analytics Screen (`/trips`)**
+  - [x] Build interactive trip replay player with Play/Pause, scrubber, and 1.5x speed toggle.
+  - [x] Render synchronized SVG elevation area chart (0m–850m) overlaid with speed polyline.
+  - [x] Fetch recorded trips from Aurora PostgreSQL PostGIS backend.
+  - [x] Wire GPX and GeoJSON trip export handlers.
 - [ ] **Phase 7: Observability Screen (`/telemetry`)**
   - [ ] Build 2x2 operational metrics grid (Lambda, Redis, DLQ, MQTT Ingest).
   - [ ] Build dark developer terminal window streaming real-time MQTT JSON records.

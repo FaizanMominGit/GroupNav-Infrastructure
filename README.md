@@ -370,15 +370,12 @@ GroupNav-Infrastructure/
 │   ├── verify-phase1.ts            # Live Cognito & Location Service verification
 │   ├── verify-phase3.ts            # Live IoT Core MQTT & SQS DLQ verification
 │   └── verify-phase5.ts            # Live CloudWatch Dashboard & Alarms verification
-├── docs/                           # Milestone "How and Why" engineering documentation
-│   ├── STEP_1_HOW_AND_WHY.md       # Multi-Stack Initialization & CDK Setup
-│   ├── STEP_2_HOW_AND_WHY.md       # VPC Architecture & $0 NAT Fee Design
-│   ├── STEP_3_HOW_AND_WHY.md       # Cognito Identity & Location Security
-│   ├── STEP_4_HOW_AND_WHY.md       # Phase 1 Cloud Verification & Client Export
-│   ├── STEP_5_HOW_AND_WHY.md       # Redis & Aurora Serverless v2 PostGIS
-│   ├── STEP_6_HOW_AND_WHY.md       # Telemetry Ingestion & Compute Pipeline
-│   ├── STEP_7_HOW_AND_WHY.md       # AWS CodePipeline CI/CD Automation
-│   └── STEP_8_HOW_AND_WHY.md       # CloudWatch Observability & Guardrails
+├── docs/                           # Comprehensive engineering documentation
+│   ├── README.md                   # Master documentation index & sitemap
+│   ├── infrastructure/             # AWS CDK Cloud Stacks (Steps 1–8)
+│   ├── mobile/                     # Flutter Mobile Architecture & Features (Steps 1–6)
+│   ├── ui/                         # UI Overhaul & Stitch Design System (Steps 1–6)
+│   └── operations/                 # Operational Runbooks & Cost Management
 ├── test/                           # Jest CDK assertion test suites (35 tests)
 ├── client-config.json              # Exported dynamic infrastructure endpoints
 ├── CONTRIBUTING.md                 # Development workflow & contribution guide
@@ -392,18 +389,32 @@ GroupNav-Infrastructure/
 
 ## 📖 Documentation & Support
 
-Detailed engineering guides documenting technical choices, architectural tradeoffs, and verification evidence for every milestone:
+Explore the complete engineering guides, architectural tradeoffs, and verification evidence:
 
-- **[Step 1: Multi-Stack Initialization](docs/STEP_1_HOW_AND_WHY.md)**
-- **[Step 2: Network Foundation & $0 NAT Fee Architecture](docs/STEP_2_HOW_AND_WHY.md)**
-- **[Step 3: Cognito Identity & Location Security](docs/STEP_3_HOW_AND_WHY.md)**
-- **[Step 4: Phase 1 Cloud Verification & Client Config Export](docs/STEP_4_HOW_AND_WHY.md)**
-- **[Step 5: Stateful Data Layer (Redis & Aurora Serverless v2 PostGIS)](docs/STEP_5_HOW_AND_WHY.md)**
-- **[Step 6: Telemetry Ingestion & Compute Pipeline](docs/STEP_6_HOW_AND_WHY.md)**
-- **[Step 7: AWS-Native CI/CD Pipeline](docs/STEP_7_HOW_AND_WHY.md)**
-- **[Step 8: CloudWatch Observability & Demo Guardrails](docs/STEP_8_HOW_AND_WHY.md)**
-- **[Architectural Blueprint & Deployment Plan](GroupNav-Infrastructure-Plan.md)**
-- **[Troubleshooting Log & Root Cause Analysis](TROUBLESHOOTING_LOG.md)**
+- **[Master Documentation Index](docs/README.md)**
+- **Cloud Infrastructure (`docs/infrastructure/`)**:
+  - [Step 1: Multi-Stack Initialization](docs/infrastructure/STEP_1_HOW_AND_WHY.md)
+  - [Step 2: Network Foundation & $0 NAT Fee Architecture](docs/infrastructure/STEP_2_HOW_AND_WHY.md)
+  - [Step 3: Cognito Identity & Location Security](docs/infrastructure/STEP_3_HOW_AND_WHY.md)
+  - [Step 4: Phase 1 Cloud Verification & Client Config Export](docs/infrastructure/STEP_4_HOW_AND_WHY.md)
+  - [Step 5: Stateful Data Layer (Redis & Aurora Serverless v2 PostGIS)](docs/infrastructure/STEP_5_HOW_AND_WHY.md)
+  - [Step 6: Telemetry Ingestion & Compute Pipeline](docs/infrastructure/STEP_6_HOW_AND_WHY.md)
+  - [Step 7: AWS-Native CI/CD Pipeline](docs/infrastructure/STEP_7_HOW_AND_WHY.md)
+  - [Step 8: CloudWatch Observability & Demo Guardrails](docs/infrastructure/STEP_8_HOW_AND_WHY.md)
+- **Mobile Client Architecture (`docs/mobile/`)**:
+  - [Step 1: Pack & Auth Decoupling](docs/mobile/STEP_1_PACK_AUTH_DECOUPLING_HOW_AND_WHY.md)
+  - [Step 2: Real Hardware GPS & Mock Fallback](docs/mobile/STEP_2_REAL_HARDWARE_GPS_HOW_AND_WHY.md)
+  - [Step 3: AWS IoT Core MQTT Integration](docs/mobile/STEP_3_AWS_IOT_MQTT_HOW_AND_WHY.md)
+  - [Step 4: Pack Room Lifecycle & Solo Mode](docs/mobile/STEP_4_PACK_ROOM_LIFECYCLE_HOW_AND_WHY.md)
+  - [Step 5: Trip Recording & GPX/GeoJSON Export](docs/mobile/STEP_5_TRIP_RECORDING_EXPORT_HOW_AND_WHY.md)
+  - [Step 6: Final Functional App Integration](docs/mobile/STEP_6_FINAL_FUNCTIONAL_APP_HOW_AND_WHY.md)
+- **UI Design System (`docs/ui/`)**:
+  - [UI Refresh Overview & Architecture](docs/ui/UI_REFRESH_HOW_AND_WHY.md)
+- **Operations & Runbooks (`docs/operations/`)**:
+  - [Service Suspension & Restore Guide](docs/operations/SERVICE_SUSPENSION_AND_RESTORE_HOW_AND_WHY.md)
+- **Reference Plans & Logs**:
+  - [Architectural Blueprint & Deployment Plan](GroupNav-Infrastructure-Plan.md)
+  - [Troubleshooting Log & Root Cause Analysis](TROUBLESHOOTING_LOG.md)
 
 Need help or found a bug? Please check [TROUBLESHOOTING_LOG.md](TROUBLESHOOTING_LOG.md) or open an issue on [GitHub Issues](https://github.com/FaizanMominGit/GroupNav-Infrastructure/issues).
 

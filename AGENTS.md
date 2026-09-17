@@ -7,7 +7,7 @@
 
 ## 2. Key Principles
 1. **Incremental Progression**: Break down implementations into clearly defined steps. Verify each step thoroughly and halt for user permission before proceeding.
-2. **Dedicated Workspace Documentation Files**: For each step/milestone, create a separate `.md` file directly in the repository (under `docs/STEP_X_HOW_AND_WHY.md`) documenting:
+2. **Dedicated Workspace Documentation Files**: For each step/milestone, create a separate `.md` file directly in the repository (under `docs/infrastructure/`, `docs/mobile/`, `docs/ui/`, or `docs/operations/`) documenting:
    - **1. How It Was Done** (technical breakdown, mechanics, configuration choices, commands run)
    - **2. Why It Was Done This Way** (architectural decisions, tradeoffs, security, cost)
    - **3. Verification Evidence** (test outputs, command logs, proof of correctness)

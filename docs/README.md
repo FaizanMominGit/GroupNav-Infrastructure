@@ -2,43 +2,6 @@
 
 Welcome to the **GroupNav Engineering Documentation**. This directory maintains the complete record of architectural decisions, implementation mechanics, technical tradeoffs, and verification evidence across the AWS CDK cloud backend, Flutter mobile client, UI design system, and operational runbooks.
 
----
-
-## 🗂️ Documentation Directory Structure
-
-```
-docs/
-├── README.md                                         # This master index
-├── infrastructure/                                   # AWS CDK Cloud Stacks & Backend Milestones
-│   ├── STEP_1_HOW_AND_WHY.md                         # CDK Multi-Stack Architecture & Init
-│   ├── STEP_2_HOW_AND_WHY.md                         # NetworkStack & $0 NAT Fee Architecture
-│   ├── STEP_3_HOW_AND_WHY.md                         # AuthStack (Cognito & Location Security)
-│   ├── STEP_4_HOW_AND_WHY.md                         # Cloud Verification & Client Config Export
-│   ├── STEP_5_HOW_AND_WHY.md                         # DataStack (Redis & Aurora PostGIS)
-│   ├── STEP_6_HOW_AND_WHY.md                         # ComputeStack (IoT Ingestion & Lambda)
-│   ├── STEP_7_HOW_AND_WHY.md                         # PipelineStack (AWS-Native CI/CD)
-│   └── STEP_8_HOW_AND_WHY.md                         # ObservabilityStack (CloudWatch & Alarms)
-├── mobile/                                           # Flutter Mobile App Features & Architecture
-│   ├── STEP_1_PACK_AUTH_DECOUPLING_HOW_AND_WHY.md    # Decoupling Pack Rooms from Rider Identity
-│   ├── STEP_2_REAL_HARDWARE_GPS_HOW_AND_WHY.md       # Real Hardware GPS with Mock Fallback
-│   ├── STEP_3_AWS_IOT_MQTT_HOW_AND_WHY.md            # AWS IoT Core Real-Time MQTT Telemetry
-│   ├── STEP_4_PACK_ROOM_LIFECYCLE_HOW_AND_WHY.md     # Pack Room Lifecycle & Solo Mode
-│   ├── STEP_5_TRIP_RECORDING_EXPORT_HOW_AND_WHY.md   # Trip Recording & GPX/GeoJSON File Export
-│   └── STEP_6_FINAL_FUNCTIONAL_APP_HOW_AND_WHY.md    # End-to-End Mobile App Integration
-├── ui/                                               # UI Refresh & Stitch Design System
-│   ├── UI_REFRESH_HOW_AND_WHY.md                     # Comprehensive UI Refresh Architecture
-│   ├── UI_STEP_1_HOW_AND_WHY.md                      # Stitch Theme Tokens & Foundation
-│   ├── UI_STEP_2_HOW_AND_WHY.md                      # Atomic Widgets & Reusable Components
-│   ├── UI_STEP_3_HOW_AND_WHY.md                      # Auth Screen & Pilot Call-sign HUD
-│   ├── UI_STEP_4_HOW_AND_WHY.md                      # Map HUD & Real-Time Convoy Telemetry
-│   ├── UI_STEP_5_HOW_AND_WHY.md                      # Pack Management & Room Formation
-│   └── UI_STEP_6_HOW_AND_WHY.md                      # Trip History & GPX Route Replay
-└── operations/                                       # Operational Runbooks & Cost Management
-    └── SERVICE_SUSPENSION_AND_RESTORE_HOW_AND_WHY.md # Cost Optimization & Teardown/Restore Guide
-```
-
----
-
 ## ☁️ 1. AWS CDK Infrastructure Milestones (`docs/infrastructure/`)
 
 | Document | Focus Area / Stack | Key Technical Achievements |
@@ -86,6 +49,8 @@ docs/
 | Document | Topic | Key Technical Achievements |
 |---|---|---|
 | [Service Suspension & Restore Guide](operations/SERVICE_SUSPENSION_AND_RESTORE_HOW_AND_WHY.md) | Cost Optimization | Teardown and restore procedures for stateful and provisioned services (Redis, Aurora, VPC Endpoints) to eliminate continuous idle spending while preserving serverless foundational layers. |
+| [Compute Layer Restoration Guide](operations/SERVICE_RESTORATION_COMPUTE_HOW_AND_WHY.md) | Operations & Health | Audit, diagnosis, and clean redeployment of `ComputeStack` (Lambda, SQS DLQ, IoT Rule, VPC Endpoints) after CloudWatch log group collision, plus end-to-end telemetry verification. |
+
 
 ---
 

@@ -32,8 +32,8 @@
     ]
   },
   "data": {
-    "redisEndpoint": "darxx9kygkawaf7.gtzybr.ng.0001.aps1.cache.amazonaws.com:6379",
-    "auroraClusterEndpoint": "datastack-auroracluster23d869c0-bojcqvtjqceq.cluster-clisq44gok7m.ap-south-1.rds.amazonaws.com"
+    "redisEndpoint": "dar1mdw4tnj9u6dg.gtzybr.ng.0001.aps1.cache.amazonaws.com:6379",
+    "auroraClusterEndpoint": "datastack-auroracluster23d869c0-bhd6ufakdnw4.cluster-clisq44gok7m.ap-south-1.rds.amazonaws.com"
   },
   "compute": {
     "lambdaArn": "arn:aws:lambda:ap-south-1:325313611329:function:groupnav-process-telemetry",

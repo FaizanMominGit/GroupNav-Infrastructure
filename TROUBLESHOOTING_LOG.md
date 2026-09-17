@@ -448,4 +448,28 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 - **Prevention Rule**:
   Do not use `nodeModules` in `NodejsFunction` bundling unless native binaries strictly require it. Bundle libraries with pure JS fallbacks (like `pg` and `redis`) directly via esbuild and mark optional native bindings (e.g. `pg-native`) in `externalModules`.
 
+---
+
+### [ISSUE-022] ComputeStack Rollback Due to Pre-existing CloudWatch Log Group Collision
+- **Date & Phase**: 2026-09-17 | Operations & Service Restoration
+- **Component / Command**: `npx cdk deploy ComputeStack` / `AWS::Logs::LogGroup`
+- **Symptom / Error Message**:
+  ```
+  Resource of type 'AWS::Logs::LogGroup' with identifier '{"/properties/LogGroupName":"/aws/lambda/groupnav-process-telemetry"}' already exists.
+  HandlerErrorCode: AlreadyExists
+  ComputeStack | ROLLBACK_COMPLETE
+  ```
+- **Root Cause Analysis**:
+  During earlier resource teardowns or lambda invocations, the CloudWatch log group `/aws/lambda/groupnav-process-telemetry` was retained in AWS CloudWatch Logs. When CloudFormation attempted to provision `ComputeStack`, CDK synthesized a managed `AWS::Logs::LogGroup` construct (`ProcessTelemetryFunctionLogGroup330788B4`) which collided with the pre-existing log group, triggering a stack rollback into `ROLLBACK_COMPLETE`.
+- **Fix / Solution Applied**:
+  1. Deleted the rolled-back stack via `aws cloudformation delete-stack --stack-name ComputeStack`.
+  2. Deleted the orphaned CloudWatch log group via `aws logs delete-log-group --log-group-name /aws/lambda/groupnav-process-telemetry`.
+  3. Re-deployed `ComputeStack` cleanly via `npx cdk deploy ComputeStack --require-approval never` (all 15 resources provisioned).
+  4. Regenerated client configuration with `npm run export-config` and validated end-to-end telemetry ingestion with `npx tsx scripts/verify-phase3.ts`.
+- **Verification**:
+  All 15 CloudFormation resources in `ComputeStack` deployed in `CREATE_COMPLETE`. End-to-end Phase 3 verification test passed cleanly, and all 35 Jest unit tests passed (6/6 test suites).
+- **Prevention Rule**:
+  Before redeploying stacks with explicit log group naming after a teardown, verify that the corresponding CloudWatch Log Groups have been pruned or set retention policies that do not collide during re-provisioning.
+
+
 

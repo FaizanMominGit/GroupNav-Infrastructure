@@ -97,8 +97,7 @@ export class ComputeStack extends cdk.Stack {
       bundling: {
         minify: true,
         sourceMap: true,
-        externalModules: ['@aws-sdk/*'], // Included in standard Node 20 runtime
-        nodeModules: ['pg', 'redis'],
+        externalModules: ['@aws-sdk/*', 'pg-native'],
       },
     });
 

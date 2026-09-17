@@ -428,4 +428,24 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 - **Prevention Rule**:
   Never inspect or mutate `notifier.state` outside of the `StateNotifier` class declaration. Pass external dependencies into the constructor and manage reactive subscriptions internally.
 
+---
+
+### [ISSUE-021] AWS CDK NodejsFunction EPERM Rename Failure on Windows
+- **Date & Phase**: 2026-09-17 | Service Restore & Deployment Verification
+- **Component / Command**: `npx cdk deploy DataStack ComputeStack ObservabilityStack` / `NodejsFunction` in `lib/compute-stack.ts`
+- **Symptom / Error Message**:
+  ```
+  [«FailedToBundleAsset» Failed to bundle asset ComputeStack/ProcessTelemetryFunction/Code/Stage, bundle output is located at D:\chirag\GroupNav-Infrastructure\cdk.out\bundling-temp-8f6cdf209b61ea8b5299404678a39ee8ba58a72ff927b23975544544b4d21f58-building: Error: EPERM: operation not permitted, rename 'D:\chirag\GroupNav-Infrastructure\cdk.out\bundling-temp-8f6cdf209b61ea8b5299404678a39ee8ba58a72ff927b23975544544b4d21f58-building' -> 'D:\chirag\GroupNav-Infrastructure\cdk.out\bundling-temp-8f6cdf209b61ea8b5299404678a39ee8ba58a72ff927b23975544544b4d21f58']
+  ```
+- **Root Cause Analysis**:
+  In `ComputeStack`, `bundling` was configured with `nodeModules: ['pg', 'redis']`. This forced CDK to invoke `npm install` inside a temporary staging folder (`cdk.out/bundling-temp-...-building`) at synthesis time. On Windows, npm background file handles or real-time file scanners retain read locks on freshly extracted files, causing CDK's subsequent synchronous directory rename (`fs.renameSync`) to fail with `EPERM: operation not permitted`.
+- **Fix / Solution Applied**:
+  Removed `nodeModules: ['pg', 'redis']` and configured direct esbuild bundling with `externalModules: ['@aws-sdk/*', 'pg-native']`. Esbuild compiles pure JavaScript implementations of `pg` and `redis` into `index.js` in ~400ms without triggering an external `npm install` process or generating lock-prone temporary directories.
+- **Verification**:
+  - `npm test`: All 6 CDK test suites and 35 unit tests passed.
+  - `npx cdk synth DataStack ComputeStack ObservabilityStack`: Succeeded with 0 errors.
+  - `npx cdk diff DataStack ComputeStack ObservabilityStack`: Succeeded with 0 errors and cleanly generated CloudFormation change sets across all 3 stacks.
+- **Prevention Rule**:
+  Do not use `nodeModules` in `NodejsFunction` bundling unless native binaries strictly require it. Bundle libraries with pure JS fallbacks (like `pg` and `redis`) directly via esbuild and mark optional native bindings (e.g. `pg-native`) in `externalModules`.
+
 

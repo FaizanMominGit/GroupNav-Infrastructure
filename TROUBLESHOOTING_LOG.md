@@ -508,6 +508,37 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 - **Prevention Rule**:
   When transitioning a client from simulation/mock prototypes to genuine cloud-connected architectures, audit test assertions so they validate authentic cloud lifecycle states and empty initialization boundaries rather than synthetic mock fixtures.
 
+---
+
+### [ISSUE-025] Flutter Riverpod CircularDependencyError on LiveRadarScreen Initialization
+- **Date & Phase**: 2026-09-18 | Real AWS Mobile Integration (Phase 4 / Step 7)
+- **Component / Command**: `LiveRadarScreen` / `radarNotifierProvider` & `packNotifierProvider`
+- **Symptom / Error Message**:
+  ```
+  Instance of 'CircularDependencyError'
+  See also: https://docs.flutter.dev/testing/errors
+  ```
+- **Root Cause Analysis**:
+  A two-way circular dependency cycle existed between `radarNotifierProvider` and `packNotifierProvider`:
+  1. When navigating to the Radar screen (default tab 1), `LiveRadarScreen` invoked `ref.watch(radarNotifierProvider)`.
+  2. During `RadarNotifier` construction, `_syncPackSubscription()` eagerly registered `_ref?.listen(packNotifierProvider)`.
+  3. Listening to `packNotifierProvider` forced Riverpod to evaluate the `packNotifierProvider` builder.
+  4. The `packNotifierProvider` builder executed `ref.watch(radarNotifierProvider.notifier)` to obtain `RadarNotifier`.
+  5. Riverpod detected that `packNotifierProvider` was requesting `radarNotifierProvider.notifier` while `radarNotifierProvider` was still mid-construction on the active instantiation stack, triggering `CircularDependencyError` and crashing the widget tree to the red error screen.
+- **Fix / Solution Applied**:
+  1. Decoupled `RadarNotifier` entirely from `packNotifierProvider`. Removed `_ref` from `RadarNotifier` and eliminated `_syncPackSubscription()`.
+  2. Injected `IotTelemetryService` (`iotTelemetryServiceProvider`) directly into `packNotifierProvider`. `PackNotifier` now directly invokes `_telemetryService.updateActivePack(...)` upon joining, creating, or leaving a pack, and calls `_telemetryService.publishAlert(...)` directly for SOS broadcasts.
+  3. Made `RadarNotifier` an optional parameter for `PackNotifier` for geofence updates, establishing a strict unidirectional Directed Acyclic Graph (DAG):
+     `IotTelemetryService` $\rightarrow$ `RadarNotifier`
+     `IotTelemetryService` + `RadarNotifier` $\rightarrow$ `PackNotifier`
+  4. Updated `LiveRadarScreen` to watch `packNotifierProvider` directly for `geofenceRadiusMeters` as the single source of truth for the convoy boundary mesh and HUD indicator chip.
+  5. Added a dedicated `ProviderContainer` unit test in `radar_test.dart` to assert that mutual initialization of `radarNotifierProvider` and `packNotifierProvider` succeeds cleanly without circular dependency errors.
+- **Verification**:
+  All 58 unit tests in `mobile/test/` passed (100% pass rate) with zero failures.
+- **Prevention Rule**:
+  Never use `ref.listen()` inside a `StateNotifier` constructor to observe a provider that itself depends on or watches that `StateNotifier` (or its `.notifier`). Cross-provider domain synchronization must either flow unidirectionally or through a shared lower-level domain service (such as `IotTelemetryService`).
+
+
 
 
 

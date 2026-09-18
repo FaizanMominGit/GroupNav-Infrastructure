@@ -63,6 +63,7 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
   Widget build(BuildContext context) {
     final radarState = ref.watch(radarNotifierProvider);
     final radarNotifier = ref.read(radarNotifierProvider.notifier);
+    final packFormation = ref.watch(packNotifierProvider);
 
     return Scaffold(
       backgroundColor: AppColors.mapSurface,
@@ -89,7 +90,7 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
                 circles: [
                   CircleMarker(
                     point: radarState.centerPosition,
-                    radius: radarState.geofenceRadiusMeters,
+                    radius: packFormation.geofenceRadiusMeters,
                     useRadiusInMeter: true,
                     color: AppColors.primary.withValues(alpha: 0.08),
                     borderColor: AppColors.primary,
@@ -157,7 +158,7 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '${radarState.geofenceRadiusMeters.round()}M CONVOY GEOFENCE',
+                      '${packFormation.geofenceRadiusMeters.round()}M CONVOY GEOFENCE',
                       style: AppTypography.labelSm.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w800,

@@ -3,7 +3,6 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/services/location_service.dart';
 import '../../auth/models/auth_state.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../groups/providers/pack_provider.dart';
 import '../../settings/models/rider_settings.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../models/convoy_peer.dart';
@@ -135,28 +134,16 @@ final iotTelemetryServiceProvider = Provider<IotTelemetryService>((ref) {
 
 final radarNotifierProvider = StateNotifierProvider<RadarNotifier, RadarState>((ref) {
   final telemetryService = ref.watch(iotTelemetryServiceProvider);
-  return RadarNotifier(telemetryService, ref);
+  return RadarNotifier(telemetryService);
 });
 
 class RadarNotifier extends StateNotifier<RadarState> {
   final IotTelemetryService _telemetryService;
-  final Ref? _ref;
 
-  RadarNotifier(this._telemetryService, [this._ref])
+  RadarNotifier(this._telemetryService)
       : super(const RadarState()) {
     _listenToTelemetry();
     _listenToConnection();
-    _syncPackSubscription();
-  }
-
-  void _syncPackSubscription() {
-    _ref?.listen(packNotifierProvider, (previous, next) {
-      if (next.isInPack && next.packCode.isNotEmpty) {
-        _telemetryService.updateActivePack(next.packCode);
-      } else {
-        _telemetryService.updateActivePack('');
-      }
-    });
   }
 
   void _listenToConnection() {

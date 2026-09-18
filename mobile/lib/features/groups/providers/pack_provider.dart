@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../radar/providers/radar_provider.dart';
+import '../../radar/services/iot_telemetry_service.dart';
 import '../models/pack_formation.dart';
 import '../models/pack_member.dart';
 import '../services/dynamodb_pack_service.dart';
@@ -16,19 +17,22 @@ final dynamoDbPackServiceProvider = Provider<DynamoDbPackService>((ref) {
 final packNotifierProvider = StateNotifierProvider<PackNotifier, PackFormation>((ref) {
   final radarNotifier = ref.watch(radarNotifierProvider.notifier);
   final packService = ref.watch(dynamoDbPackServiceProvider);
-  return PackNotifier(radarNotifier, packService, ref);
+  final telemetryService = ref.watch(iotTelemetryServiceProvider);
+  return PackNotifier(radarNotifier, packService, ref, telemetryService);
 });
 
 class PackNotifier extends StateNotifier<PackFormation> {
-  final RadarNotifier _radarNotifier;
+  final RadarNotifier? _radarNotifier;
   final DynamoDbPackService? _packService;
   final Ref? _ref;
+  final IotTelemetryService? _telemetryService;
   Timer? _rosterSyncTimer;
 
-  PackNotifier(
-    this._radarNotifier, [
+  PackNotifier([
+    this._radarNotifier,
     this._packService,
     this._ref,
+    this._telemetryService,
   ]) : super(_soloFormation()) {
     _initRiderIdentity();
   }
@@ -68,7 +72,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
   void updateGeofenceRadius(double radius) {
     final clamped = radius.clamp(200.0, 5000.0);
     state = state.copyWith(geofenceRadiusMeters: clamped);
-    _radarNotifier.updateGeofenceRadius(clamped);
+    _radarNotifier?.updateGeofenceRadius(clamped);
 
     // Sync to AWS DynamoDB if in an active pack
     if (state.isInPack && state.packCode.isNotEmpty && _ref != null && _packService != null) {
@@ -92,12 +96,23 @@ class PackNotifier extends StateNotifier<PackFormation> {
 
   void broadcastSos() {
     final callsign = _ref?.read(authNotifierProvider).pilot?.callsign ?? 'Pilot';
-    _radarNotifier.publishAlert(
-      packId: state.packId.isNotEmpty ? state.packId : 'convoy',
-      alertType: 'Emergency SOS',
-      callsign: callsign,
-      message: 'CRITICAL: Rider requested immediate emergency response.',
-    );
+    final packId = state.packId.isNotEmpty ? state.packId : 'convoy';
+    const message = 'CRITICAL: Rider requested immediate emergency response.';
+    if (_telemetryService != null) {
+      _telemetryService.publishAlert(
+        packId: packId,
+        alertType: 'Emergency SOS',
+        callsign: callsign,
+        message: message,
+      );
+    } else {
+      _radarNotifier?.publishAlert(
+        packId: packId,
+        alertType: 'Emergency SOS',
+        callsign: callsign,
+        message: message,
+      );
+    }
   }
 
   String generateQrPayload() {
@@ -130,6 +145,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
 
     final callsign = auth?.pilot?.callsign ?? 'Apex';
     state = _soloFormation(callsign);
+    _telemetryService?.updateActivePack('');
   }
 
   /// Disband active convoy (alias to leavePack)
@@ -158,6 +174,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
           ),
         ],
       );
+      _telemetryService?.updateActivePack('GN-1000');
       return;
     }
 
@@ -185,6 +202,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
     );
 
     state = formation;
+    _telemetryService?.updateActivePack(formation.packCode);
     _startRosterPolling(code);
   }
 
@@ -212,6 +230,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
         title: 'Pack Formation #$cleanCode',
         isTelemetrySyncActive: true,
       );
+      _telemetryService?.updateActivePack(cleanCode);
       return;
     }
 
@@ -240,6 +259,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
     );
 
     state = formation;
+    _telemetryService?.updateActivePack(formation.packCode);
     _startRosterPolling(cleanCode);
   }
 

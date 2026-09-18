@@ -1,5 +1,8 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:groupnav_mobile/core/config/client_config.dart';
+import 'package:groupnav_mobile/features/auth/providers/auth_provider.dart';
+import 'package:groupnav_mobile/features/groups/providers/pack_provider.dart';
 import 'package:groupnav_mobile/features/radar/models/convoy_peer.dart';
 import 'package:groupnav_mobile/features/radar/models/telemetry_packet.dart';
 import 'package:groupnav_mobile/features/radar/providers/radar_provider.dart';
@@ -128,6 +131,24 @@ void main() {
       expect(packPacket.packId, equals('GN-9482'));
 
       service.dispose();
+    });
+  });
+
+  group('Riverpod Provider Dependency Hierarchy', () {
+    test('ProviderContainer initializes radarNotifierProvider and packNotifierProvider without CircularDependencyError', () {
+      final container = ProviderContainer(
+        overrides: [
+          clientConfigProvider.overrideWithValue(dummyConfig),
+        ],
+      );
+      final radar = container.read(radarNotifierProvider);
+      final pack = container.read(packNotifierProvider);
+
+      expect(radar, isNotNull);
+      expect(radar.peers, isEmpty);
+      expect(pack, isNotNull);
+      expect(pack.isInPack, isFalse);
+      container.dispose();
     });
   });
 }

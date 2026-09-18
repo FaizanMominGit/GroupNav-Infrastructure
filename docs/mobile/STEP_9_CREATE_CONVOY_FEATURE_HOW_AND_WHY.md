@@ -62,3 +62,4 @@ Running `flutter analyze` in `mobile/`:
 ### 3. Physical Hardware Execution Evidence
 - Deployed and launched on physical hardware (`Realme RMX3997`, Android 16 / API 36).
 - Creation sheet opens smoothly, displays Road Captain identity, updates presets, and launches the active convoy view with live QR code pairing.
+- **Resolved `isInPack` State Synchronization**: Identified that `DynamoDbPackService` omitted `isInPack: true` upon entity construction, causing the UI to default to solo mode even after successful DynamoDB creation. Explicitly bound `isInPack: true` and verified real-time transition to active room `GN-3554` on hardware.

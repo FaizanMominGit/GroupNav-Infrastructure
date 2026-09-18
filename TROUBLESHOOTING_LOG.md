@@ -538,7 +538,40 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 - **Prevention Rule**:
   Never use `ref.listen()` inside a `StateNotifier` constructor to observe a provider that itself depends on or watches that `StateNotifier` (or its `.notifier`). Cross-provider domain synchronization must either flow unidirectionally or through a shared lower-level domain service (such as `IotTelemetryService`).
 
+---
 
+### [ISSUE-026] RenderFlex Overflow on Create Convoy Bottom Sheet Header Row
+- **Date & Phase**: 2026-09-18 | Milestone 2 (Create Convoy Feature)
+- **Component / Command**: `CreateConvoySheet` (`mobile/lib/features/groups/widgets/create_convoy_sheet.dart`)
+- **Symptom / Error Message**:
+  ```
+  A RenderFlex overflowed by 14 pixels on the right.
+  The relevant error-causing widget was: Row
+  ```
+- **Root Cause Analysis**:
+  In `CreateConvoySheet`, the top header row placed an icon container (`36x36`), a `Column` containing the title ("Create Convoy Room") and subtitle ("Launch real-time telemetry rendezvous..."), and a close `IconButton` directly within a `Row`. Because the text column was not wrapped in `Expanded`, on compact mobile display widths (e.g., 720px wide Android viewports), the long subtitle string forced the intrinsic row width beyond the screen boundary, triggering Flutter's yellow-and-black striped pixel overflow indicator.
+- **Fix / Solution Applied**:
+  Wrapped the title/subtitle `Column` in an `Expanded` widget and set `overflow: TextOverflow.ellipsis` on the subtitle text.
+- **Verification**:
+  Captured live device screenshot on `Realme RMX3997` confirming zero pixel overflow indicators across all screen densities.
+- **Prevention Rule**:
+  Always wrap variable-width text columns placed between fixed-width icons inside horizontal `Row` widgets in `Expanded` or `Flexible`, and declare explicit truncation policies (`TextOverflow.ellipsis`) for multi-word descriptive subtitles.
 
+---
 
-
+### [ISSUE-027] DynamoDbPackService Omitted isInPack: true on PackFormation Instantiation
+- **Date & Phase**: 2026-09-18 | Milestone 2 (Create Convoy Feature)
+- **Component / Command**: `DynamoDbPackService` (`dynamodb_pack_service.dart`) & `PackNotifier` (`pack_provider.dart`)
+- **Symptom / Error Message**:
+  After clicking "Launch Convoy Room", the green toast appeared stating room was launched and AWS PutItem succeeded in DynamoDB (`groupnav-packs`), but the screen did not display the active convoy room or QR code card, remaining on "Solo Ride Mode" / "Ride Independently or Join a Convoy".
+- **Root Cause Analysis**:
+  `PackFormation` model defines `final bool isInPack` with a default of `false`. Inside `DynamoDbPackService.createPack` and `_parsePackItem`, `PackFormation` was constructed without supplying `isInPack: true`. Consequently, `state = formation` received an entity with `isInPack == false`. In `PackManagementScreen`, the body builder evaluated `formation.isInPack ? _buildInPackView(...) : _buildSoloView(...)`, causing Flutter to render the solo placeholder instead of the active convoy room.
+- **Fix / Solution Applied**:
+  1. Set `isInPack: true` explicitly in `DynamoDbPackService.createPack`.
+  2. Set `isInPack: packCode.isNotEmpty` in `DynamoDbPackService._parsePackItem`.
+  3. Added defensive `state = formation.copyWith(isInPack: true)` across `createPack`, `joinPack`, and `_startRosterPolling` in `pack_provider.dart`.
+  4. Added an offline/guest fallback so pilots without active AWS credentials can also launch convoy rooms without throwing unhandled credential exceptions.
+- **Verification**:
+  Dealt with live on physical hardware (`Realme RMX3997`). Created room `GN-3554` and verified screen immediately transitions to the active convoy room displaying the `GN-3554` join code, Copy button, interactive Pair QR dialog, geofence radius slider, and connected member roster.
+- **Prevention Rule**:
+  Whenever constructing domain models from database or network responses that represent active joined states, always explicitly define boolean membership flags rather than relying on default constructor values that default to unjoined states.

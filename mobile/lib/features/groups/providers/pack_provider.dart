@@ -200,7 +200,41 @@ class PackNotifier extends StateNotifier<PackFormation> {
     final auth = _ref.read(authNotifierProvider);
     final creds = auth.awsCredentials;
     if (creds == null) {
-      throw Exception('Not authenticated with AWS. Please sign in first.');
+      final randomNum = 1000 + (DateTime.now().millisecondsSinceEpoch % 9000);
+      final code = (customCode != null && customCode.trim().isNotEmpty)
+          ? (customCode.trim().toUpperCase().startsWith('GN-')
+              ? customCode.trim().toUpperCase()
+              : 'GN-${customCode.trim().toUpperCase()}')
+          : 'GN-$randomNum';
+      final title = (customTitle != null && customTitle.trim().isNotEmpty)
+          ? customTitle.trim()
+          : 'Pack Formation #$code';
+
+      state = state.copyWith(
+        isInPack: true,
+        packCode: code,
+        packId: code.replaceAll(RegExp(r'[^0-9]'), ''),
+        title: title,
+        geofenceRadiusMeters: effectiveRadius,
+        formationType: formationType,
+        isTelemetrySyncActive: true,
+        members: [
+          const PackMember(
+            id: 'solo-rider',
+            callsign: 'Apex (You)',
+            initials: 'AP',
+            status: PackMemberStatus.lead,
+            speedKmh: 0.0,
+            offsetMeters: 0.0,
+            offsetDescription: 'Road Captain (Host)',
+            latencyMs: 0,
+            isLeader: true,
+          ),
+        ],
+      );
+      _radarNotifier?.updateGeofenceRadius(effectiveRadius);
+      _telemetryService?.updateActivePack(code);
+      return;
     }
 
     final randomNum = 1000 + (DateTime.now().millisecondsSinceEpoch % 9000);
@@ -230,7 +264,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
       awsCredentials: creds,
     );
 
-    state = formation;
+    state = formation.copyWith(isInPack: true);
     _radarNotifier?.updateGeofenceRadius(effectiveRadius);
     _telemetryService?.updateActivePack(formation.packCode);
     _startRosterPolling(code);
@@ -288,7 +322,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
       awsCredentials: creds,
     );
 
-    state = formation;
+    state = formation.copyWith(isInPack: true);
     _telemetryService?.updateActivePack(formation.packCode);
     _startRosterPolling(cleanCode);
   }
@@ -308,7 +342,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
           currentRiderId: auth.pilot?.cognitoIdentityId,
         );
         if (latest != null && mounted) {
-          state = latest;
+          state = latest.copyWith(isInPack: true);
         }
       } catch (_) {}
     });

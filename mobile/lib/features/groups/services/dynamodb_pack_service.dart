@@ -93,6 +93,7 @@ class DynamoDbPackService {
       geofenceRadiusMeters: geofenceRadiusMeters,
       formationType: formationType,
       isTelemetrySyncActive: true,
+      isInPack: true,
       members: [
         PackMember(
           id: hostRiderId,
@@ -404,6 +405,7 @@ class DynamoDbPackService {
       geofenceRadiusMeters: radius,
       formationType: formationType,
       isTelemetrySyncActive: true,
+      isInPack: packCode.isNotEmpty,
       members: members,
     );
   }

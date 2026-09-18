@@ -27,7 +27,7 @@ Current status indicator:
 
 ## 2. Convoy & Pack Management (Rooms & Groups)
 
-- [x] **Create Convoy Pack Room**: Instantly create a new pack session with a unique 6-character room code.
+- [x] **Create Convoy Pack Room**: Instantly create a new pack session with a unique 6-character room code, custom ride titles, dynamic geofence perimeter, and tactical formation presets.
 - [x] **Join by Room Code**: Enter 6-digit alphanumeric codes (with formatting tolerance and uppercase normalization).
 - [x] **Direct Clipboard Paste**: One-tap paste of room codes or encoded rendezvous payloads from the clipboard.
 - [x] **In-Person QR Code Rendezvous Generator**: Generate an interactive QR code containing the full pack rendezvous configuration for instant group pairing.
@@ -40,7 +40,7 @@ Current status indicator:
   - **Pack Members**: Regular convoy participants with live telemetry sharing.
 - [ ] **Universal Share Links**: Deep links via WhatsApp, Telegram, SMS, or AirDrop (e.g., `groupnav.app/join/ABC123`).
 - [ ] **Pack Moderation**: Captain permissions to kick disruptive riders or lock the room to prevent new entries.
-- [ ] **Pack Formations**: Preset riding formations (Staggered 2-second spacing, Single File for twisties, Free Cruise).
+- [x] **Pack Formations**: Preset riding formations (Staggered 2-second spacing, Single File for twisties, Free Cruise) with active discipline indicators.
 - [ ] **Disband / End Convoy**: Captain closes the room and archives the group session for all participants.
 
 ---
@@ -133,11 +133,11 @@ Current status indicator:
 | Category | Total Features | Implemented (`[x]`) | Ready to Build (`[ ]`) |
 |---|:---:|:---:|:---:|
 | **1. Auth & Identity** | 9 | 4 | 5 |
-| **2. Convoy & Pack Management** | 11 | 6 | 5 |
+| **2. Convoy & Pack Management** | 11 | 7 | 4 |
 | **3. Live Radar & Tracking** | 10 | 6 | 4 |
 | **4. Tactical Comms & Safety** | 8 | 3 | 5 |
 | **5. Trip Recording & Export** | 10 | 7 | 3 |
 | **6. Garage & Settings** | 8 | 3 | 5 |
 | **7. Web3 / DePIN & Gamification** | 4 | 0 | 4 |
 | **8. Offline & Mesh Resilience** | 2 | 0 | 2 |
-| **Total** | **62** | **29** | **33** |
+| **Total** | **62** | **30** | **32** |

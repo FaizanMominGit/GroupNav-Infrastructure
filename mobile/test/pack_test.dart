@@ -211,5 +211,37 @@ void main() {
       expect(packNotifier.state.members.first.isLeader, isTrue);
       expect(packNotifier.state.members.first.offsetDescription, equals('Convoy Lead'));
     });
+
+    test('createPack supports custom title, code, geofence, and formation discipline', () {
+      packNotifier.leavePack();
+      expect(packNotifier.state.isInPack, isFalse);
+
+      packNotifier.createPack(
+        customTitle: 'Skyline Sunset Cruise',
+        customCode: 'GN-4422',
+        geofenceRadius: 1500.0,
+        formationType: 'SINGLE_FILE',
+      );
+
+      expect(packNotifier.state.isInPack, isTrue);
+      expect(packNotifier.state.packCode, equals('GN-4422'));
+      expect(packNotifier.state.title, equals('Skyline Sunset Cruise'));
+      expect(packNotifier.state.geofenceRadiusMeters, equals(1500.0));
+      expect(packNotifier.state.formationType, equals('SINGLE_FILE'));
+      expect(packNotifier.state.formationLabel, equals('Single File'));
+      expect(packNotifier.state.formationDescription, contains('Mountain'));
+      expect(radarNotifier.state.geofenceRadiusMeters, equals(1500.0));
+    });
+
+    test('PackFormation returns correct formation descriptions for all presets', () {
+      const staggered = PackFormation(formationType: 'STAGGERED');
+      expect(staggered.formationLabel, equals('Staggered (2s)'));
+
+      const singleFile = PackFormation(formationType: 'SINGLE_FILE');
+      expect(singleFile.formationLabel, equals('Single File'));
+
+      const freeFlight = PackFormation(formationType: 'FREE_FLIGHT');
+      expect(freeFlight.formationLabel, equals('Free Cruise'));
+    });
   });
 }

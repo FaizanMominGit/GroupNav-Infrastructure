@@ -7,6 +7,7 @@ class PackFormation {
   final double geofenceRadiusMeters;
   final bool isTelemetrySyncActive;
   final bool isInPack;
+  final String formationType;
   final List<PackMember> members;
 
   const PackFormation({
@@ -16,6 +17,7 @@ class PackFormation {
     this.geofenceRadiusMeters = 800.0,
     this.isTelemetrySyncActive = false,
     this.isInPack = false,
+    this.formationType = 'STAGGERED',
     this.members = const [],
   });
 
@@ -27,6 +29,30 @@ class PackFormation {
     return '${geofenceRadiusMeters.round()}m';
   }
 
+  String get formationLabel {
+    switch (formationType.toUpperCase()) {
+      case 'SINGLE_FILE':
+        return 'Single File';
+      case 'FREE_FLIGHT':
+        return 'Free Cruise';
+      case 'STAGGERED':
+      default:
+        return 'Staggered (2s)';
+    }
+  }
+
+  String get formationDescription {
+    switch (formationType.toUpperCase()) {
+      case 'SINGLE_FILE':
+        return 'Mountain & Twisties formation';
+      case 'FREE_FLIGHT':
+        return 'Open highway free spacing';
+      case 'STAGGERED':
+      default:
+        return '2-second lane zigzag spacing';
+    }
+  }
+
   int get connectedCount => members.where((m) => m.status != PackMemberStatus.offline).length;
 
   PackFormation copyWith({
@@ -36,6 +62,7 @@ class PackFormation {
     double? geofenceRadiusMeters,
     bool? isTelemetrySyncActive,
     bool? isInPack,
+    String? formationType,
     List<PackMember>? members,
   }) {
     return PackFormation(
@@ -45,6 +72,7 @@ class PackFormation {
       geofenceRadiusMeters: geofenceRadiusMeters ?? this.geofenceRadiusMeters,
       isTelemetrySyncActive: isTelemetrySyncActive ?? this.isTelemetrySyncActive,
       isInPack: isInPack ?? this.isInPack,
+      formationType: formationType ?? this.formationType,
       members: members ?? this.members,
     );
   }

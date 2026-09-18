@@ -152,13 +152,31 @@ class PackNotifier extends StateNotifier<PackFormation> {
   Future<void> disbandConvoy() => leavePack();
 
   /// Create a real convoy room on AWS DynamoDB
-  Future<void> createPack() async {
+  Future<void> createPack({
+    String? customTitle,
+    String? customCode,
+    double? geofenceRadius,
+    String formationType = 'STAGGERED',
+  }) async {
+    final effectiveRadius = geofenceRadius ?? state.geofenceRadiusMeters;
+
     if (_ref == null || _packService == null) {
+      final code = (customCode != null && customCode.trim().isNotEmpty)
+          ? (customCode.trim().toUpperCase().startsWith('GN-')
+              ? customCode.trim().toUpperCase()
+              : 'GN-${customCode.trim().toUpperCase()}')
+          : 'GN-1000';
+      final title = (customTitle != null && customTitle.trim().isNotEmpty)
+          ? customTitle.trim()
+          : 'Pack Formation #$code';
+
       state = state.copyWith(
         isInPack: true,
-        packCode: 'GN-1000',
-        packId: '1000',
-        title: 'Pack Formation #GN-1000',
+        packCode: code,
+        packId: code.replaceAll(RegExp(r'[^0-9]'), ''),
+        title: title,
+        geofenceRadiusMeters: effectiveRadius,
+        formationType: formationType,
         isTelemetrySyncActive: true,
         members: [
           const PackMember(
@@ -174,7 +192,8 @@ class PackNotifier extends StateNotifier<PackFormation> {
           ),
         ],
       );
-      _telemetryService?.updateActivePack('GN-1000');
+      _radarNotifier?.updateGeofenceRadius(effectiveRadius);
+      _telemetryService?.updateActivePack(code);
       return;
     }
 
@@ -185,7 +204,16 @@ class PackNotifier extends StateNotifier<PackFormation> {
     }
 
     final randomNum = 1000 + (DateTime.now().millisecondsSinceEpoch % 9000);
-    final code = 'GN-$randomNum';
+    final code = (customCode != null && customCode.trim().isNotEmpty)
+        ? (customCode.trim().toUpperCase().startsWith('GN-')
+            ? customCode.trim().toUpperCase()
+            : 'GN-${customCode.trim().toUpperCase()}')
+        : 'GN-$randomNum';
+
+    final title = (customTitle != null && customTitle.trim().isNotEmpty)
+        ? customTitle.trim()
+        : 'Pack Formation #$code';
+
     final pilot = auth.pilot;
     final riderId = pilot?.cognitoIdentityId ?? 'rider-$randomNum';
     final callsign = pilot?.callsign ?? 'Captain';
@@ -193,15 +221,17 @@ class PackNotifier extends StateNotifier<PackFormation> {
 
     final formation = await _packService.createPack(
       packCode: code,
-      title: 'Pack Formation #$code',
+      title: title,
       hostRiderId: riderId,
       hostCallsign: callsign,
       bikeModel: vehicleClass,
-      geofenceRadiusMeters: state.geofenceRadiusMeters,
+      geofenceRadiusMeters: effectiveRadius,
+      formationType: formationType,
       awsCredentials: creds,
     );
 
     state = formation;
+    _radarNotifier?.updateGeofenceRadius(effectiveRadius);
     _telemetryService?.updateActivePack(formation.packCode);
     _startRosterPolling(code);
   }

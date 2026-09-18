@@ -28,6 +28,7 @@ class DynamoDbPackService {
     required String hostCallsign,
     required String bikeModel,
     double geofenceRadiusMeters = 800.0,
+    String formationType = 'STAGGERED',
     required Map<String, String> awsCredentials,
   }) async {
     final hostMember = {
@@ -53,6 +54,7 @@ class DynamoDbPackService {
         'packId': {'S': packCode.replaceAll(RegExp(r'[^0-9]'), '')},
         'title': {'S': title},
         'hostRiderId': {'S': hostRiderId},
+        'formationType': {'S': formationType},
         'geofenceRadiusMeters': {'N': geofenceRadiusMeters.toString()},
         'createdAt': {'N': DateTime.now().millisecondsSinceEpoch.toString()},
         'updatedAt': {'N': DateTime.now().millisecondsSinceEpoch.toString()},
@@ -89,6 +91,7 @@ class DynamoDbPackService {
       packCode: packCode,
       title: title,
       geofenceRadiusMeters: geofenceRadiusMeters,
+      formationType: formationType,
       isTelemetrySyncActive: true,
       members: [
         PackMember(
@@ -392,11 +395,14 @@ class DynamoDbPackService {
       ));
     }
 
+    final formationType = item['formationType']?['S'] as String? ?? 'STAGGERED';
+
     return PackFormation(
       packId: packId,
       packCode: packCode,
       title: title,
       geofenceRadiusMeters: radius,
+      formationType: formationType,
       isTelemetrySyncActive: true,
       members: members,
     );

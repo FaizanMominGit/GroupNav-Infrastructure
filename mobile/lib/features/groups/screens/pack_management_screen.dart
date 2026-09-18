@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../providers/pack_provider.dart';
 import '../widgets/active_code_card.dart';
+import '../widgets/create_convoy_sheet.dart';
 import '../widgets/geofence_slider_widget.dart';
 import '../widgets/pack_roster_card.dart';
 
@@ -370,30 +371,7 @@ class PackManagementScreen extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () async {
-                        try {
-                          await packNotifier.createPack();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Created new Convoy Room on AWS! You are Convoy Lead.'),
-                                backgroundColor: AppColors.primary,
-                                duration: Duration(seconds: 3),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Failed to create convoy on AWS: ${e.toString().replaceAll("Exception: ", "")}'),
-                                backgroundColor: AppColors.alertCritical,
-                                duration: const Duration(seconds: 4),
-                              ),
-                            );
-                          }
-                        }
-                      },
+                      onPressed: () => CreateConvoySheet.show(context),
                       icon: const Icon(Icons.add_circle_outline, size: 18, color: Colors.white),
                       label: const Text('Create Convoy'),
                       style: ElevatedButton.styleFrom(

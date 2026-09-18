@@ -177,38 +177,43 @@ class _CreateConvoySheetState extends ConsumerState<CreateConvoySheet> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryFixed.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(10),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryFixed.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.add_circle, color: AppColors.primary, size: 20),
                       ),
-                      child: const Icon(Icons.add_circle, color: AppColors.primary, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Create Convoy Room',
-                          style: AppTypography.headlineMd.copyWith(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 18,
-                          ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Create Convoy Room',
+                              style: AppTypography.headlineMd.copyWith(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                              ),
+                            ),
+                            Text(
+                              'Launch real-time telemetry rendezvous on AWS',
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.labelSm.copyWith(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          'Launch real-time telemetry rendezvous on AWS',
-                          style: AppTypography.labelSm.copyWith(
-                            color: AppColors.textSecondary,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),

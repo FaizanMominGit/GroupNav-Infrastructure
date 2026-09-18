@@ -4,12 +4,14 @@ import 'package:groupnav_mobile/core/config/client_config.dart';
 import 'package:groupnav_mobile/features/auth/providers/auth_provider.dart';
 import 'package:groupnav_mobile/features/groups/providers/pack_provider.dart';
 import 'package:groupnav_mobile/features/radar/models/convoy_peer.dart';
+import 'package:groupnav_mobile/features/radar/models/convoy_route.dart';
 import 'package:groupnav_mobile/features/radar/models/telemetry_packet.dart';
 import 'package:groupnav_mobile/features/radar/providers/radar_provider.dart';
 import 'package:groupnav_mobile/features/radar/services/iot_telemetry_service.dart';
 import 'package:latlong2/latlong.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   const dummyConfig = ClientConfig(
     region: 'ap-south-1',
     cognito: CognitoConfig(userPoolId: 'u', userPoolClientId: 'c', identityPoolId: 'i'),
@@ -151,4 +153,87 @@ void main() {
       container.dispose();
     });
   });
+
+  group('ConvoyRoute & Leader Authority Tests', () {
+    test('Default routes are loaded with valid waypoints and metadata', () {
+      expect(ConvoyRoute.defaultRoutes.length, greaterThanOrEqualTo(4));
+      final first = ConvoyRoute.defaultRoutes.first;
+      expect(first.title, contains('Skyline Summit'));
+      expect(first.waypoints.length, greaterThan(2));
+      expect(first.distanceKm, greaterThan(0));
+
+      final json = first.toJson();
+      final restored = ConvoyRoute.fromJson(json);
+      expect(restored.id, equals(first.id));
+      expect(restored.title, equals(first.title));
+      expect(restored.waypoints.length, equals(first.waypoints.length));
+    });
+
+    test('Leader route change updates activeRoute and waypoints in RadarState', () {
+      final container = ProviderContainer(
+        overrides: [
+          clientConfigProvider.overrideWithValue(dummyConfig),
+        ],
+      );
+
+      final notifier = container.read(radarNotifierProvider.notifier);
+      final coastalRoute = ConvoyRoute.defaultRoutes[1]; // Coastal Marine Highway
+
+      notifier.setRoute(coastalRoute, broadcast: false);
+
+      final state = container.read(radarNotifierProvider);
+      expect(state.activeRoute?.id, equals(coastalRoute.id));
+      expect(state.activeRoute?.title, equals('Coastal Marine Highway'));
+      expect(state.routeWaypoints, equals(coastalRoute.waypoints));
+
+      container.dispose();
+    });
+
+    test('Leader status toggle updates isLeader flag', () {
+      final container = ProviderContainer(
+        overrides: [
+          clientConfigProvider.overrideWithValue(dummyConfig),
+        ],
+      );
+
+      final notifier = container.read(radarNotifierProvider.notifier);
+      expect(container.read(radarNotifierProvider).isLeader, isTrue);
+
+      notifier.updateLeaderStatus(false);
+      expect(container.read(radarNotifierProvider).isLeader, isFalse);
+
+      notifier.updateLeaderStatus(true);
+      expect(container.read(radarNotifierProvider).isLeader, isTrue);
+
+      container.dispose();
+    });
+
+    test('Quick alerts are published and recorded in telemetry metrics', () async {
+      final service = IotTelemetryService(config: dummyConfig);
+
+      Map<String, dynamic>? emittedAlert;
+      final sub = service.alertStream.listen((alert) {
+        emittedAlert = alert;
+      });
+
+      service.publishAlert(
+        packId: 'GN-4421',
+        alertType: 'Regroup',
+        callsign: 'Apex (Lead)',
+        message: 'Regroup at waypoint 3',
+      );
+
+      // Give stream event a microtask to fire
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(emittedAlert, isNotNull);
+      expect(emittedAlert!['packId'], equals('GN-4421'));
+      expect(emittedAlert!['alertType'], equals('Regroup'));
+      expect(emittedAlert!['callsign'], equals('Apex (Lead)'));
+
+      await sub.cancel();
+      service.dispose();
+    });
+  });
 }
+

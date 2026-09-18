@@ -17,6 +17,10 @@ class RadarHudSheet extends StatelessWidget {
   });
 
   void _triggerAlert(BuildContext context, String alertType) {
+    if (alertType == 'Custom Message') {
+      _showCustomMessageDialog(context);
+      return;
+    }
     if (onSendQuickAlert != null) {
       onSendQuickAlert!(alertType);
     }
@@ -26,12 +30,97 @@ class RadarHudSheet extends StatelessWidget {
           children: [
             const Icon(Icons.notifications_active, color: Colors.white, size: 18),
             const SizedBox(width: 8),
-            Text('Convoy Alert Broadcast: "$alertType" sent to pack!'),
+            Expanded(
+              child: Text('Convoy Alert Broadcast: "$alertType" sent to pack!'),
+            ),
           ],
         ),
         backgroundColor: AppColors.primary,
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showCustomMessageDialog(BuildContext context) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.chat_bubble_outline, color: AppColors.primary, size: 20),
+            const SizedBox(width: 8),
+            Text('Custom Convoy Alert', style: AppTypography.headlineMd.copyWith(fontSize: 18)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Broadcast an immediate tactical status message to all convoy members via AWS IoT Core MQTT.',
+              style: AppTypography.labelSm.copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              style: AppTypography.bodyMd,
+              decoration: InputDecoration(
+                hintText: 'e.g. Road debris ahead, take left lane',
+                hintStyle: AppTypography.bodySm.copyWith(color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                filled: true,
+                fillColor: AppColors.surfaceContainerLow,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.borderSubtle),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty && onSendQuickAlert != null) {
+                onSendQuickAlert!(text);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        const Icon(Icons.notifications_active, color: Colors.white, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text('Convoy Alert Broadcast: "$text"')),
+                      ],
+                    ),
+                    backgroundColor: AppColors.primary,
+                    duration: const Duration(seconds: 3),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+              Navigator.of(ctx).pop();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('BROADCAST'),
+          ),
+        ],
       ),
     );
   }
@@ -60,7 +149,91 @@ class RadarHudSheet extends StatelessWidget {
               borderRadius: AppTheme.radiusFull,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
+
+          // Live Broadcast & AWS IoT Beacon Bar
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                InkWell(
+                  onTap: onToggleBroadcast,
+                  borderRadius: AppTheme.radiusFull,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: state.isBroadcasting
+                          ? AppColors.telemetryEmerald.withValues(alpha: 0.12)
+                          : AppColors.alertWarning.withValues(alpha: 0.12),
+                      borderRadius: AppTheme.radiusFull,
+                      border: Border.all(
+                        color: state.isBroadcasting
+                            ? AppColors.telemetryEmerald.withValues(alpha: 0.3)
+                            : AppColors.alertWarning.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: state.isBroadcasting
+                                ? AppColors.telemetryEmerald
+                                : AppColors.alertWarning,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          state.isBroadcasting ? 'BROADCASTING LIVE' : 'BROADCAST PAUSED',
+                          style: AppTypography.labelSm.copyWith(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: state.isBroadcasting
+                                ? AppColors.telemetryEmerald
+                                : AppColors.alertWarning,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLow,
+                    borderRadius: AppTheme.radiusFull,
+                    border: Border.all(color: AppColors.borderSubtle),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        state.isAwsConnected ? Icons.cloud_done : Icons.cloud_off,
+                        size: 11,
+                        color: state.isAwsConnected ? AppColors.telemetryEmerald : AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        state.isAwsConnected
+                            ? 'IoT MQTT • ${state.broadcastCount} pkts'
+                            : 'Hardware GPS Fix',
+                        style: AppTypography.labelSm.copyWith(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
 
           // 3-Card Bento Metric Grid
           Row(

@@ -6,6 +6,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../settings/models/rider_settings.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../models/convoy_peer.dart';
+import '../models/convoy_route.dart';
 import '../services/iot_telemetry_service.dart';
 
 class RadarState {
@@ -20,6 +21,10 @@ class RadarState {
   final double geofenceRadiusMeters;
   final List<LatLng> routeWaypoints;
   final bool isAwsConnected;
+  final ConvoyRoute? activeRoute;
+  final int broadcastCount;
+  final DateTime? lastBroadcastTime;
+  final bool isLeader;
 
   const RadarState({
     this.peers = const [],
@@ -33,6 +38,10 @@ class RadarState {
     this.geofenceRadiusMeters = 800.0,
     this.routeWaypoints = const [],
     this.isAwsConnected = false,
+    this.activeRoute,
+    this.broadcastCount = 0,
+    this.lastBroadcastTime,
+    this.isLeader = true,
   });
 
   String get headingDisplay {
@@ -69,6 +78,10 @@ class RadarState {
     double? geofenceRadiusMeters,
     List<LatLng>? routeWaypoints,
     bool? isAwsConnected,
+    ConvoyRoute? activeRoute,
+    int? broadcastCount,
+    DateTime? lastBroadcastTime,
+    bool? isLeader,
   }) {
     return RadarState(
       peers: peers ?? this.peers,
@@ -82,6 +95,10 @@ class RadarState {
       geofenceRadiusMeters: geofenceRadiusMeters ?? this.geofenceRadiusMeters,
       routeWaypoints: routeWaypoints ?? this.routeWaypoints,
       isAwsConnected: isAwsConnected ?? this.isAwsConnected,
+      activeRoute: activeRoute ?? this.activeRoute,
+      broadcastCount: broadcastCount ?? this.broadcastCount,
+      lastBroadcastTime: lastBroadcastTime ?? this.lastBroadcastTime,
+      isLeader: isLeader ?? this.isLeader,
     );
   }
 }
@@ -141,15 +158,29 @@ class RadarNotifier extends StateNotifier<RadarState> {
   final IotTelemetryService _telemetryService;
 
   RadarNotifier(this._telemetryService)
-      : super(const RadarState()) {
+      : super(RadarState(
+          activeRoute: ConvoyRoute.defaultRoutes.first,
+          routeWaypoints: ConvoyRoute.defaultRoutes.first.waypoints,
+        )) {
     _listenToTelemetry();
     _listenToConnection();
+    _listenToRouteUpdates();
   }
 
   void _listenToConnection() {
     _telemetryService.connectionStatusStream.listen((connected) {
       if (!mounted) return;
       state = state.copyWith(isAwsConnected: connected);
+    });
+  }
+
+  void _listenToRouteUpdates() {
+    _telemetryService.routeUpdateStream.listen((route) {
+      if (!mounted) return;
+      state = state.copyWith(
+        activeRoute: route,
+        routeWaypoints: route.waypoints,
+      );
     });
   }
 
@@ -186,8 +217,27 @@ class RadarNotifier extends StateNotifier<RadarState> {
         packCohesion: cohesion,
         cohesionStatus: status,
         isAwsConnected: _telemetryService.isMqttConnected,
+        broadcastCount: _telemetryService.broadcastCount,
+        lastBroadcastTime: _telemetryService.lastBroadcastTime,
       );
     });
+  }
+
+  /// Change active navigation course and broadcast to convoy members
+  void setRoute(ConvoyRoute route, {bool broadcast = true}) {
+    state = state.copyWith(
+      activeRoute: route,
+      routeWaypoints: route.waypoints,
+    );
+    if (broadcast) {
+      _telemetryService.broadcastRoute(route);
+    }
+  }
+
+  /// Update leader status
+  void updateLeaderStatus(bool isLeader) {
+    _telemetryService.updateLeaderStatus(isLeader);
+    state = state.copyWith(isLeader: isLeader);
   }
 
   void publishAlert({

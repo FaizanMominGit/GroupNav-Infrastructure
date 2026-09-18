@@ -8,6 +8,7 @@ import '../../../core/config/client_config.dart';
 import '../../../core/services/aws_sigv4_signer.dart';
 import '../../../core/services/location_service.dart';
 import '../models/convoy_peer.dart';
+import '../models/convoy_route.dart';
 import '../models/telemetry_packet.dart';
 
 class IotTelemetryService {
@@ -22,6 +23,9 @@ class IotTelemetryService {
   String _currentRiderId = 'pilot';
   String _currentCallsign = 'Apex';
   String _activePackCode = '';
+  bool _isLeader = true;
+  int _broadcastCount = 0;
+  DateTime? _lastBroadcastTime;
 
   final Map<String, ConvoyPeer> _activePeers = {};
 
@@ -34,8 +38,13 @@ class IotTelemetryService {
   final _connectionStatusController = StreamController<bool>.broadcast();
   Stream<bool> get connectionStatusStream => _connectionStatusController.stream;
 
+  final _routeUpdateController = StreamController<ConvoyRoute>.broadcast();
+  Stream<ConvoyRoute> get routeUpdateStream => _routeUpdateController.stream;
+
   bool get isBroadcasting => _isBroadcasting;
   bool get isMqttConnected => _isMqttConnected;
+  int get broadcastCount => _broadcastCount;
+  DateTime? get lastBroadcastTime => _lastBroadcastTime;
 
   IotTelemetryService({
     required this.config,
@@ -47,9 +56,16 @@ class IotTelemetryService {
     _startLocationStreaming();
   }
 
-  void updateRiderIdentity({required String riderId, required String callsign}) {
+  void updateRiderIdentity({required String riderId, required String callsign, bool? isLeader}) {
     _currentRiderId = riderId;
     _currentCallsign = callsign;
+    if (isLeader != null) {
+      _isLeader = isLeader;
+    }
+  }
+
+  void updateLeaderStatus(bool isLeader) {
+    _isLeader = isLeader;
   }
 
   void updateActivePack(String packCode) {
@@ -149,6 +165,16 @@ class IotTelemetryService {
 
   void _handleIncomingTelemetry(Map<String, dynamic> data) {
     try {
+      if (data['action'] == 'route_change') {
+        final routeJson = data['route'] as Map<String, dynamic>?;
+        if (routeJson != null) {
+          final route = ConvoyRoute.fromJson(routeJson);
+          _routeUpdateController.add(route);
+          debugPrint('[IotTelemetryService] Adopted leader route update: ${route.title}');
+        }
+        return;
+      }
+
       final packet = TelemetryPacket.fromJson(data);
       if (packet.riderId == _currentRiderId) return; // Skip self
 
@@ -160,9 +186,9 @@ class IotTelemetryService {
         speedKmh: packet.speedKmh,
         headingDeg: packet.headingDeg,
         relativeOffsetMeters: 0,
-        isLeader: false,
+        isLeader: data['isLeader'] as bool? ?? false,
         beaconColorHex: '#00C48C',
-        monikerTag: 'Rider',
+        monikerTag: data['isLeader'] == true ? 'Lead' : 'Rider',
       );
 
       _activePeers[packet.riderId] = remotePeer;
@@ -187,9 +213,9 @@ class IotTelemetryService {
         speedKmh: pos.speedKmh,
         headingDeg: pos.headingDeg,
         relativeOffsetMeters: 0,
-        isLeader: true,
+        isLeader: _isLeader,
         beaconColorHex: '#0066FF',
-        monikerTag: 'HQ',
+        monikerTag: _isLeader ? 'Lead' : 'HQ',
       );
 
       _activePeers[_currentRiderId] = selfPeer;
@@ -228,8 +254,38 @@ class IotTelemetryService {
         final builder = MqttClientPayloadBuilder();
         builder.addString(jsonEncode(packet.toJson()));
         _mqttClient!.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
+        _broadcastCount++;
+        _lastBroadcastTime = DateTime.now();
       } catch (e) {
         debugPrint('[IotTelemetryService] Publish telemetry error: $e');
+      }
+    }
+  }
+
+  /// Broadcast a Convoy Navigation Route update to all connected riders (Leader only)
+  void broadcastRoute(ConvoyRoute route) {
+    final payload = {
+      'action': 'route_change',
+      'packId': _activePackCode,
+      'riderId': _currentRiderId,
+      'callsign': _currentCallsign,
+      'route': route.toJson(),
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+
+    if (_mqttClient != null && _isMqttConnected) {
+      try {
+        final topic = _activePackCode.isNotEmpty
+            ? 'groupnav/packs/$_activePackCode/telemetry'
+            : 'groupnav/$_currentRiderId/telemetry';
+        final builder = MqttClientPayloadBuilder();
+        builder.addString(jsonEncode(payload));
+        _mqttClient!.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
+        _broadcastCount++;
+        _lastBroadcastTime = DateTime.now();
+        debugPrint('[IotTelemetryService] Broadcast route ${route.title} on MQTT topic $topic');
+      } catch (e) {
+        debugPrint('[IotTelemetryService] Publish route error: $e');
       }
     }
   }
@@ -257,6 +313,8 @@ class IotTelemetryService {
         final builder = MqttClientPayloadBuilder();
         builder.addString(jsonEncode(alertData));
         _mqttClient!.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
+        _broadcastCount++;
+        _lastBroadcastTime = DateTime.now();
       } catch (e) {
         debugPrint('[IotTelemetryService] Publish alert error: $e');
       }
@@ -291,6 +349,7 @@ class IotTelemetryService {
     _mqttClient?.disconnect();
     _telemetryController.close();
     _alertController.close();
+    _routeUpdateController.close();
     _connectionStatusController.close();
   }
 }

@@ -575,3 +575,40 @@ When an issue, error, or unexpected behavior is encountered, document it using t
   Dealt with live on physical hardware (`Realme RMX3997`). Created room `GN-3554` and verified screen immediately transitions to the active convoy room displaying the `GN-3554` join code, Copy button, interactive Pair QR dialog, geofence radius slider, and connected member roster.
 - **Prevention Rule**:
   Whenever constructing domain models from database or network responses that represent active joined states, always explicitly define boolean membership flags rather than relying on default constructor values that default to unjoined states.
+
+---
+
+### [ISSUE-028] Convoy Marker Callsign Badge Pixel Overflow on Physical Hardware Screen
+- **Date & Phase**: 2026-09-18 | Milestone 3 (Radar Tab Hardware GPS & Route Authority)
+- **Component / Command**: `ConvoyMarkerWidget` (`convoy_marker_widget.dart`) & `LiveRadarScreen` (`live_radar_screen.dart`)
+- **Symptom / Error Message**:
+  ```
+  A RenderFlex overflowed by 15 pixels on the right.
+  The relevant error-causing widget was: Row in ConvoyMarkerWidget
+  ```
+- **Root Cause Analysis**:
+  When displaying the pilot's own live marker on the map, the callsign string is formatted as `"$callsign (You)"` and paired with moniker badge `"Lead"`. In `MarkerLayer`, the marker dimensions were constrained to `width: peer.isLeader ? 110 : 90`. Because `110px` was insufficient to accommodate the combined width of the green pulse dot, callsign string, and leader offset badge, the `Row` overflowed by 15 pixels.
+- **Fix / Solution Applied**:
+  1. Wrapped `peer.callsign` inside a `Flexible` widget with `TextOverflow.ellipsis` in `ConvoyMarkerWidget` so long names truncate gracefully without violating layout constraints.
+  2. Increased marker layer dimensions in `LiveRadarScreen` from `110x80` to `150x84` for leaders, and `120x68` for followers.
+- **Verification**:
+  Captured live device screenshot on `Realme RMX3997` confirming the marker displays `• Apex (You) Lead` with compass direction disc and zero overflow warnings.
+- **Prevention Rule**:
+  Map marker overlays that render dynamic participant identities must size their parent `Marker` container with adequate margin for multi-token labels and wrap text elements inside `Flexible` with explicit overflow handling.
+
+---
+
+### [ISSUE-029] Modal Bottom Sheet InkWell Touch Event Interception in RouteSelectionSheet
+- **Date & Phase**: 2026-09-18 | Milestone 3 (Radar Tab Hardware GPS & Route Authority)
+- **Component / Command**: `RouteSelectionSheet` (`route_selection_sheet.dart`)
+- **Symptom / Error Message**:
+  Tapping on course option cards inside `RouteSelectionSheet` did not trigger the route change callback or dismiss the modal bottom sheet.
+- **Root Cause Analysis**:
+  In Flutter's modal bottom sheets, wrapping interactive list cards with `InkWell` without an enclosing `Material` ancestor inside the sheet's view tree causes the gesture disambiguation arena to drop pointer events or route them to the modal backdrop.
+- **Fix / Solution Applied**:
+  Replaced `InkWell` with `GestureDetector` configured with `behavior: HitTestBehavior.opaque` on each route card item, guaranteeing immediate pointer event capture and instantaneous dispatch to `onSelectRoute(route)`.
+- **Verification**:
+  Tapped "Coastal Marine Highway" card on physical device; verified sheet dismissed immediately, top pill updated to `Coastal Marine Highway • 32.0 km`, and green toast banner announced course dispatch via AWS IoT Core MQTT.
+- **Prevention Rule**:
+  Inside custom bottom sheet dialogs, prefer `GestureDetector` with `HitTestBehavior.opaque` over bare `InkWell` when wrapping complex card layouts to ensure touch events are reliably dispatched across all Android gesture navigations.
+

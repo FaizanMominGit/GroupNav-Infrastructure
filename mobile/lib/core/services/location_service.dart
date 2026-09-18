@@ -81,6 +81,25 @@ class HardwareLocationEngine implements ILocationEngine {
         return false;
       }
 
+      // Immediately emit last known position if available for instantaneous fix
+      try {
+        final lastPos = await Geolocator.getLastKnownPosition();
+        if (lastPos != null) {
+          final speedKmh = (lastPos.speed.clamp(0.0, 300.0) * 3.6);
+          _controller.add(
+            PositionData(
+              latitude: lastPos.latitude,
+              longitude: lastPos.longitude,
+              altitude: lastPos.altitude,
+              speedKmh: speedKmh,
+              headingDeg: lastPos.heading,
+              accuracyMeters: lastPos.accuracy,
+              timestamp: lastPos.timestamp,
+            ),
+          );
+        }
+      } catch (_) {}
+
       const locationSettings = LocationSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 2, // 2 meters movement delta
@@ -178,7 +197,7 @@ class LocationService {
   StreamSubscription<PositionData>? _engineSub;
   PositionData? _lastPosition;
 
-  LocationService({LocationMode initialMode = LocationMode.simulation})
+  LocationService({LocationMode initialMode = LocationMode.hardware})
       : _mode = initialMode,
         _engine = initialMode == LocationMode.hardware
             ? HardwareLocationEngine()
@@ -189,6 +208,10 @@ class LocationService {
   LocationMode get mode => _mode;
   Stream<PositionData> get positionStream => _unifiedController.stream;
   PositionData? get currentPosition => _lastPosition;
+
+  Future<LocationPermission> requestPermission() async {
+    return await Geolocator.requestPermission();
+  }
 
   Future<void> setMode(LocationMode newMode) async {
     if (_mode == newMode) return;

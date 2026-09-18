@@ -53,6 +53,10 @@ Current status indicator:
 - [x] **Real-Time Convoy Markers**: Dynamic map pins showing rider position, callsign label, speed, heading arrow, and leader indicator.
 - [x] **Telemetry HUD (Heads-Up Display)**: Live speedometer gauge, elevation, battery level, compass heading, and GPS fix accuracy.
 - [x] **Live AWS IoT Core Streaming**: Secure telemetry broadcast (`groupnav/{riderId}/telemetry`) via MQTT over WebSocket (port 443) signed with SigV4 credentials.
+- [x] **Road Captain Route Authority & Course Dispatch**: Convoy leader can designate tactical routes from curated catalog, immediately synchronizing waypoints to all participants via MQTT.
+- [x] **Follower Route Lock Protection**: Followers' navigation courses are locked to the Road Captain's route and update automatically without polling.
+- [x] **Curated Tactical Route Catalog**: Route library with distance, duration, elevation gain, difficulty levels, and recommended formations.
+- [x] **Live Telemetry & Broadcast Metrics Pill**: Heads-up status bar showing live AWS IoT MQTT connection, packet counts, and hardware GPS fix.
 - [ ] **Camera Centering & View Modes**:
   - **Follow Me**: Keeps user centered in direction of travel (Head-Up).
   - **Fit Pack**: Auto-zooms to keep all active convoy members on screen at once.

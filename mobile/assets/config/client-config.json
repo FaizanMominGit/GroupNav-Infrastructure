@@ -45,5 +45,8 @@
     "pipelineArn": "arn:aws:codepipeline:ap-south-1:325313611329:GroupNav-Infrastructure-Pipeline",
     "gitHubConnectionArn": "arn:aws:codestar-connections:ap-south-1:325313611329:connection/d8157624-26c4-4b54-b689-3bc221f82a96",
     "artifactBucketName": "groupnav-pipeline-artifacts-325313611329-ap-south-1"
+  },
+  "packs": {
+    "tableName": "groupnav-packs"
   }
 }

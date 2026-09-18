@@ -7,7 +7,7 @@ import '../models/trip_record.dart';
 
 class TripPlaybackState {
   final List<TripRecord> availableTrips;
-  final TripRecord selectedTrip;
+  final TripRecord? selectedTrip;
   final bool isPlaying;
   final double progress; // 0.0 to 1.0
   final double playbackSpeed; // 1.0, 1.5, 2.0
@@ -20,13 +20,17 @@ class TripPlaybackState {
   final List<ElevationPoint> recordedElevations;
 
   const TripPlaybackState({
-    required this.availableTrips,
-    required this.selectedTrip,
+    this.availableTrips = const [],
+    this.selectedTrip,
     this.isPlaying = false,
     this.progress = 0.0,
     this.playbackSpeed = 1.0,
-    required this.activePosition,
-    required this.currentElevationPoint,
+    this.activePosition = const LatLng(19.0760, 72.8777),
+    this.currentElevationPoint = const ElevationPoint(
+      distanceKm: 0.0,
+      elevationMeters: 0.0,
+      speedKmh: 0.0,
+    ),
     this.isRecording = false,
     this.activeRecordingTitle,
     this.recordingStartTime,
@@ -35,7 +39,8 @@ class TripPlaybackState {
   });
 
   Duration get currentDuration {
-    final totalMs = selectedTrip.duration.inMilliseconds;
+    if (selectedTrip == null) return Duration.zero;
+    final totalMs = selectedTrip!.duration.inMilliseconds;
     return Duration(milliseconds: (totalMs * progress).round());
   }
 
@@ -83,9 +88,7 @@ class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
   Timer? _playbackTimer;
   StreamSubscription<PositionData>? _locationSub;
 
-  TripHistoryNotifier({this.locationService}) : super(_initialState()) {
-    // Initial sync
-    _updateInterpolatedState(0.0);
+  TripHistoryNotifier({this.locationService}) : super(const TripPlaybackState()) {
     _listenToLocation();
   }
 
@@ -99,20 +102,6 @@ class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
         );
       }
     });
-  }
-
-  static TripPlaybackState _initialState() {
-    final trips = _getMockTrips();
-    final initialTrip = trips.first;
-    return TripPlaybackState(
-      availableTrips: trips,
-      selectedTrip: initialTrip,
-      isPlaying: false,
-      progress: 0.0,
-      playbackSpeed: 1.0,
-      activePosition: initialTrip.routeCoordinates.first,
-      currentElevationPoint: initialTrip.elevationProfile.first,
-    );
   }
 
   void startRecording({String? title}) {
@@ -211,8 +200,8 @@ class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
       duration: duration,
       maxSpeedKmh: double.parse(maxSpeed.toStringAsFixed(1)),
       avgSpeedKmh: double.parse(avgSpeed.toStringAsFixed(1)),
-      totalClimbMeters: 120,
-      packRidersCount: 4,
+      totalClimbMeters: 0,
+      packRidersCount: 1,
       routeCoordinates: state.recordedCoordinates,
       waypoints: waypoints,
       elevationProfile: state.recordedElevations,
@@ -226,7 +215,9 @@ class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
       selectedTrip: newTrip,
       progress: 0.0,
       activePosition: newTrip.routeCoordinates.first,
-      currentElevationPoint: newTrip.elevationProfile.first,
+      currentElevationPoint: newTrip.elevationProfile.isNotEmpty
+          ? newTrip.elevationProfile.first
+          : const ElevationPoint(distanceKm: 0, elevationMeters: 0, speedKmh: 0),
     );
 
     return newTrip;
@@ -238,11 +229,14 @@ class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
       selectedTrip: trip,
       progress: 0.0,
       activePosition: trip.routeCoordinates.first,
-      currentElevationPoint: trip.elevationProfile.first,
+      currentElevationPoint: trip.elevationProfile.isNotEmpty
+          ? trip.elevationProfile.first
+          : const ElevationPoint(distanceKm: 0, elevationMeters: 0, speedKmh: 0),
     );
   }
 
   void togglePlayPause() {
+    if (state.selectedTrip == null) return;
     if (state.isPlaying) {
       pause();
     } else {
@@ -251,8 +245,8 @@ class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
   }
 
   void play() {
+    if (state.selectedTrip == null) return;
     if (state.progress >= 1.0) {
-      // Loop from start if finished
       seekProgress(0.0);
     }
     state = state.copyWith(isPlaying: true);
@@ -266,6 +260,7 @@ class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
   }
 
   void seekProgress(double newProgress) {
+    if (state.selectedTrip == null) return;
     final clamped = newProgress.clamp(0.0, 1.0);
     _updateInterpolatedState(clamped);
   }
@@ -286,12 +281,11 @@ class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
     _playbackTimer?.cancel();
     const interval = Duration(milliseconds: 100);
     _playbackTimer = Timer.periodic(interval, (timer) {
-      if (!state.isPlaying) {
+      if (!state.isPlaying || state.selectedTrip == null) {
         timer.cancel();
         return;
       }
 
-      // Step duration: 100ms * speedMultiplier over a standard 60-second replay demo
       const simulatedReplayDurationSeconds = 60.0;
       final progressStep = (0.1 * state.playbackSpeed) / simulatedReplayDurationSeconds;
       final newProgress = state.progress + progressStep;
@@ -300,20 +294,45 @@ class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
         seekProgress(1.0);
         pause();
       } else {
-        _updateInterpolatedState(newProgress);
+        seekProgress(newProgress);
       }
     });
   }
 
   void _updateInterpolatedState(double progress) {
     final trip = state.selectedTrip;
-    final pos = trip.interpolatePosition(progress);
-    final elev = trip.interpolateElevationPoint(progress);
+    if (trip == null || trip.routeCoordinates.isEmpty) return;
+
+    final coords = trip.routeCoordinates;
+    final totalSegments = coords.length - 1;
+    LatLng newPos;
+
+    if (totalSegments <= 0) {
+      newPos = coords.first;
+    } else {
+      final scaledProgress = progress * totalSegments;
+      final index = scaledProgress.floor().clamp(0, totalSegments - 1);
+      final fraction = scaledProgress - index;
+
+      final p1 = coords[index];
+      final p2 = coords[index + 1];
+
+      final lat = p1.latitude + (p2.latitude - p1.latitude) * fraction;
+      final lng = p1.longitude + (p2.longitude - p1.longitude) * fraction;
+      newPos = LatLng(lat, lng);
+    }
+
+    ElevationPoint newElev = const ElevationPoint(distanceKm: 0, elevationMeters: 0, speedKmh: 0);
+    if (trip.elevationProfile.isNotEmpty) {
+      final elevProfile = trip.elevationProfile;
+      final elevIndex = (progress * (elevProfile.length - 1)).round().clamp(0, elevProfile.length - 1);
+      newElev = elevProfile[elevIndex];
+    }
 
     state = state.copyWith(
       progress: progress,
-      activePosition: pos,
-      currentElevationPoint: elev,
+      activePosition: newPos,
+      currentElevationPoint: newElev,
     );
   }
 
@@ -322,132 +341,6 @@ class TripHistoryNotifier extends StateNotifier<TripPlaybackState> {
     _playbackTimer?.cancel();
     _locationSub?.cancel();
     super.dispose();
-  }
-
-  static List<TripRecord> _getMockTrips() {
-    // 1. Pacific Coast Highway Run
-    final pchCoordinates = [
-      const LatLng(37.7749, -122.4194),
-      const LatLng(37.7500, -122.4400),
-      const LatLng(37.7100, -122.4700),
-      const LatLng(37.6600, -122.4900),
-      const LatLng(37.6000, -122.5000),
-      const LatLng(37.5400, -122.5150),
-      const LatLng(37.4800, -122.4800),
-      const LatLng(37.4200, -122.4400),
-      const LatLng(37.3800, -122.4000),
-      const LatLng(37.3200, -122.3800),
-    ];
-
-    final pchElevation = [
-      const ElevationPoint(distanceKm: 0.0, elevationMeters: 45.0, speedKmh: 42.0),
-      const ElevationPoint(distanceKm: 8.5, elevationMeters: 120.0, speedKmh: 68.0),
-      const ElevationPoint(distanceKm: 18.0, elevationMeters: 280.0, speedKmh: 82.0),
-      const ElevationPoint(distanceKm: 28.5, elevationMeters: 410.0, speedKmh: 95.0),
-      const ElevationPoint(distanceKm: 39.0, elevationMeters: 620.0, speedKmh: 88.0),
-      const ElevationPoint(distanceKm: 48.2, elevationMeters: 740.0, speedKmh: 112.0),
-      const ElevationPoint(distanceKm: 58.0, elevationMeters: 850.0, speedKmh: 76.0),
-      const ElevationPoint(distanceKm: 68.0, elevationMeters: 510.0, speedKmh: 84.0),
-      const ElevationPoint(distanceKm: 78.4, elevationMeters: 110.0, speedKmh: 64.0),
-    ];
-
-    final pchWaypoints = [
-      TripWaypoint(position: pchCoordinates.first, title: 'Presidio Gate (Start)', type: WaypointType.start),
-      TripWaypoint(position: pchCoordinates[4], title: 'Devil\'s Slide Checkpoint', type: WaypointType.checkpoint),
-      TripWaypoint(position: pchCoordinates.last, title: 'Half Moon Bay Marina (Finish)', type: WaypointType.finish),
-    ];
-
-    // 2. Monterey to Big Sur Sprint
-    final bigSurCoordinates = [
-      const LatLng(36.6002, -121.8947),
-      const LatLng(36.5500, -121.9200),
-      const LatLng(36.4800, -121.9100),
-      const LatLng(36.4200, -121.8900),
-      const LatLng(36.3600, -121.8700),
-      const LatLng(36.2704, -121.8081),
-    ];
-
-    final bigSurElevation = [
-      const ElevationPoint(distanceKm: 0.0, elevationMeters: 15.0, speedKmh: 50.0),
-      const ElevationPoint(distanceKm: 10.5, elevationMeters: 180.0, speedKmh: 78.0),
-      const ElevationPoint(distanceKm: 22.0, elevationMeters: 390.0, speedKmh: 88.0),
-      const ElevationPoint(distanceKm: 34.0, elevationMeters: 680.0, speedKmh: 98.0),
-      const ElevationPoint(distanceKm: 46.2, elevationMeters: 220.0, speedKmh: 65.0),
-    ];
-
-    final bigSurWaypoints = [
-      TripWaypoint(position: bigSurCoordinates.first, title: 'Fisherman\'s Wharf (Start)', type: WaypointType.start),
-      TripWaypoint(position: bigSurCoordinates[2], title: 'Bixby Creek Bridge (CP-2)', type: WaypointType.checkpoint),
-      TripWaypoint(position: bigSurCoordinates.last, title: 'Nepenthe Vista (Finish)', type: WaypointType.finish),
-    ];
-
-    // 3. Skyline Ridge Formation
-    final skylineCoordinates = [
-      const LatLng(37.4500, -122.2500),
-      const LatLng(37.4000, -122.2400),
-      const LatLng(37.3500, -122.2100),
-      const LatLng(37.3000, -122.1800),
-      const LatLng(37.2500, -122.1500),
-    ];
-
-    final skylineElevation = [
-      const ElevationPoint(distanceKm: 0.0, elevationMeters: 320.0, speedKmh: 62.0),
-      const ElevationPoint(distanceKm: 8.0, elevationMeters: 550.0, speedKmh: 82.0),
-      const ElevationPoint(distanceKm: 16.0, elevationMeters: 780.0, speedKmh: 105.0),
-      const ElevationPoint(distanceKm: 24.0, elevationMeters: 640.0, speedKmh: 78.0),
-      const ElevationPoint(distanceKm: 32.8, elevationMeters: 410.0, speedKmh: 70.0),
-    ];
-
-    final skylineWaypoints = [
-      TripWaypoint(position: skylineCoordinates.first, title: 'Highway 9 Summit (Start)', type: WaypointType.start),
-      TripWaypoint(position: skylineCoordinates[2], title: 'Russian Ridge Checkpoint', type: WaypointType.checkpoint),
-      TripWaypoint(position: skylineCoordinates.last, title: 'Alice\'s Restaurant (Finish)', type: WaypointType.finish),
-    ];
-
-    return [
-      TripRecord(
-        id: 'trip-pch-804',
-        title: 'Pacific Coast Highway Run',
-        date: DateTime(2024, 10, 14, 9, 30),
-        distanceKm: 78.4,
-        duration: const Duration(hours: 1, minutes: 42),
-        maxSpeedKmh: 112.0,
-        avgSpeedKmh: 64.0,
-        totalClimbMeters: 1240,
-        packRidersCount: 4,
-        routeCoordinates: pchCoordinates,
-        waypoints: pchWaypoints,
-        elevationProfile: pchElevation,
-      ),
-      TripRecord(
-        id: 'trip-bigsur-912',
-        title: 'Monterey to Big Sur Sprint',
-        date: DateTime(2024, 10, 11, 14, 15),
-        distanceKm: 46.2,
-        duration: const Duration(minutes: 54),
-        maxSpeedKmh: 98.0,
-        avgSpeedKmh: 58.0,
-        totalClimbMeters: 890,
-        packRidersCount: 3,
-        routeCoordinates: bigSurCoordinates,
-        waypoints: bigSurWaypoints,
-        elevationProfile: bigSurElevation,
-      ),
-      TripRecord(
-        id: 'trip-skyline-501',
-        title: 'Skyline Ridge Formation',
-        date: DateTime(2024, 10, 8, 11, 0),
-        distanceKm: 32.8,
-        duration: const Duration(minutes: 38),
-        maxSpeedKmh: 105.0,
-        avgSpeedKmh: 72.0,
-        totalClimbMeters: 640,
-        packRidersCount: 5,
-        routeCoordinates: skylineCoordinates,
-        waypoints: skylineWaypoints,
-        elevationProfile: skylineElevation,
-      ),
-    ];
   }
 }
 

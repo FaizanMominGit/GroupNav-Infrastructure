@@ -10,12 +10,12 @@ class PackFormation {
   final List<PackMember> members;
 
   const PackFormation({
-    this.packId = '804',
-    this.packCode = 'GN-9482',
-    this.title = 'Pack Formation #804',
-    this.geofenceRadiusMeters = 850.0,
-    this.isTelemetrySyncActive = true,
-    this.isInPack = true,
+    this.packId = '',
+    this.packCode = '',
+    this.title = 'Solo Ride Mode',
+    this.geofenceRadiusMeters = 800.0,
+    this.isTelemetrySyncActive = false,
+    this.isInPack = false,
     this.members = const [],
   });
 

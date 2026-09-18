@@ -17,20 +17,24 @@ class AuthOnboardingScreen extends ConsumerStatefulWidget {
 }
 
 class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
-  late final TextEditingController _contactController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _passwordController;
   late final TextEditingController _callsignController;
+  bool _obscurePassword = true;
 
   @override
   void initState() {
     super.initState();
     final authNotifier = ref.read(authNotifierProvider.notifier);
-    _contactController = TextEditingController(text: authNotifier.phoneOrEmail);
+    _emailController = TextEditingController(text: authNotifier.email);
+    _passwordController = TextEditingController(text: authNotifier.password);
     _callsignController = TextEditingController(text: authNotifier.callsign);
   }
 
   @override
   void dispose() {
-    _contactController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     _callsignController.dispose();
     super.dispose();
   }
@@ -58,7 +62,7 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                 // Top Header Pill (Layer Z-20)
                 TopAppBarPill(
                   title: 'GroupNav',
-                  subtitle: 'DePIN',
+                  subtitle: 'AWS Live',
                   rewardRate: 4.2,
                   onMenuPressed: () {},
                 ),
@@ -84,11 +88,8 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 // Status Badges
-                                Wrap(
-                                  alignment: WrapAlignment.spaceBetween,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  spacing: 8,
-                                  runSpacing: 6,
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -99,10 +100,10 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(Icons.lock, size: 13, color: AppColors.primary),
+                                          const Icon(Icons.cloud_done, size: 13, color: AppColors.primary),
                                           const SizedBox(width: 4),
                                           Text(
-                                            'SECURE ACCESS',
+                                            'AWS COGNITO',
                                             style: AppTypography.labelSm.copyWith(
                                               color: AppColors.primary,
                                               fontWeight: FontWeight.w800,
@@ -124,7 +125,7 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
-                                          'AWS Cognito Connected',
+                                          'Real-Time Auth',
                                           style: AppTypography.labelSm.copyWith(color: AppColors.textSecondary),
                                         ),
                                       ],
@@ -133,24 +134,125 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                 ),
                                 const SizedBox(height: 12),
 
-                                Text('Pilot Authentication', style: AppTypography.headlineLg),
+                                Text(
+                                  authNotifier.isSignUpMode ? 'Create Pilot Account' : 'Pilot Sign In',
+                                  style: AppTypography.headlineLg,
+                                ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Link vehicle communications to initiate real-time telemetry consensus.',
+                                  authNotifier.isSignUpMode
+                                      ? 'Register with AWS Cognito User Pool to obtain authenticated telemetry credentials.'
+                                      : 'Sign in to access your convoy telemetry, rooms, and live radar tracking.',
                                   style: AppTypography.bodySm,
                                 ),
-                                const SizedBox(height: 18),
+                                const SizedBox(height: 16),
 
-                                // Phone / Email Input Field
-                                Text('Mobile Number / Pilot Email', style: AppTypography.labelMd),
+                                // Mode Switcher: Sign In vs Sign Up
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surfaceContainerLow,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            if (authNotifier.isSignUpMode) {
+                                              setState(() {
+                                                authNotifier.toggleSignUpMode();
+                                              });
+                                            }
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: !authNotifier.isSignUpMode
+                                                  ? AppColors.cardBg
+                                                  : Colors.transparent,
+                                              borderRadius: BorderRadius.circular(8),
+                                              boxShadow: !authNotifier.isSignUpMode
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: Colors.black.withValues(alpha: 0.05),
+                                                        blurRadius: 4,
+                                                      ),
+                                                    ]
+                                                  : null,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                'Sign In',
+                                                style: AppTypography.labelMd.copyWith(
+                                                  fontWeight: !authNotifier.isSignUpMode
+                                                      ? FontWeight.w700
+                                                      : FontWeight.w500,
+                                                  color: !authNotifier.isSignUpMode
+                                                      ? AppColors.primary
+                                                      : AppColors.textSecondary,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            if (!authNotifier.isSignUpMode) {
+                                              setState(() {
+                                                authNotifier.toggleSignUpMode();
+                                              });
+                                            }
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: authNotifier.isSignUpMode
+                                                  ? AppColors.cardBg
+                                                  : Colors.transparent,
+                                              borderRadius: BorderRadius.circular(8),
+                                              boxShadow: authNotifier.isSignUpMode
+                                                  ? [
+                                                      BoxShadow(
+                                                        color: Colors.black.withValues(alpha: 0.05),
+                                                        blurRadius: 4,
+                                                      ),
+                                                    ]
+                                                  : null,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                'Create Account',
+                                                style: AppTypography.labelMd.copyWith(
+                                                  fontWeight: authNotifier.isSignUpMode
+                                                      ? FontWeight.w700
+                                                      : FontWeight.w500,
+                                                  color: authNotifier.isSignUpMode
+                                                      ? AppColors.primary
+                                                      : AppColors.textSecondary,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Email Input Field
+                                Text('Pilot Email Address', style: AppTypography.labelMd),
                                 const SizedBox(height: 6),
                                 TextFormField(
-                                  controller: _contactController,
+                                  controller: _emailController,
                                   keyboardType: TextInputType.emailAddress,
                                   style: AppTypography.bodyMd,
                                   decoration: InputDecoration(
-                                    prefixIcon: const Icon(Icons.phone_iphone, size: 20, color: AppColors.textSecondary),
-                                    suffixIcon: const Icon(Icons.check_circle, size: 20, color: AppColors.telemetryEmerald),
+                                    hintText: 'pilot@groupnav.io',
+                                    prefixIcon: const Icon(Icons.email_outlined, size: 20, color: AppColors.textSecondary),
                                     filled: true,
                                     fillColor: AppColors.surfaceContainerLowest,
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -163,37 +265,32 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                       borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                                     ),
                                   ),
-                                  onChanged: authNotifier.setPhoneOrEmail,
+                                  onChanged: authNotifier.setEmail,
                                 ),
                                 const SizedBox(height: 14),
 
-                                // Tactical Callsign Field
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        'Tactical Callsign',
-                                        style: AppTypography.labelMd,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: Text(
-                                        'Pre-assigned mesh tag',
-                                        style: AppTypography.labelSm.copyWith(color: AppColors.primary),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                // Password Input Field
+                                Text('Account Password', style: AppTypography.labelMd),
                                 const SizedBox(height: 6),
                                 TextFormField(
-                                  controller: _callsignController,
-                                  style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w700),
+                                  controller: _passwordController,
+                                  obscureText: _obscurePassword,
+                                  style: AppTypography.bodyMd,
                                   decoration: InputDecoration(
-                                    prefixIcon: const Icon(Icons.tag, size: 20, color: AppColors.textSecondary),
+                                    hintText: 'Min 8 chars, uppercase & digits',
+                                    prefixIcon: const Icon(Icons.lock_outline, size: 20, color: AppColors.textSecondary),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                        size: 20,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscurePassword = !_obscurePassword;
+                                        });
+                                      },
+                                    ),
                                     filled: true,
                                     fillColor: AppColors.surfaceContainerLowest,
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -206,18 +303,86 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                       borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                                     ),
                                   ),
-                                  onChanged: authNotifier.setCallsign,
+                                  onChanged: authNotifier.setPassword,
                                 ),
-                                const SizedBox(height: 18),
+                                const SizedBox(height: 14),
 
-                                // Continue with OTP Button
+                                // Callsign Field (Visible in Sign Up mode)
+                                if (authNotifier.isSignUpMode) ...[
+                                  Text('Tactical Callsign', style: AppTypography.labelMd),
+                                  const SizedBox(height: 6),
+                                  TextFormField(
+                                    controller: _callsignController,
+                                    style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w700),
+                                    decoration: InputDecoration(
+                                      hintText: 'e.g. Apex, Maverick, Ghost',
+                                      prefixIcon: const Icon(Icons.tag, size: 20, color: AppColors.textSecondary),
+                                      filled: true,
+                                      fillColor: AppColors.surfaceContainerLowest,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                      border: OutlineInputBorder(
+                                        borderRadius: AppTheme.radiusMd,
+                                        borderSide: const BorderSide(color: AppColors.borderSubtle),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: AppTheme.radiusMd,
+                                        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                                      ),
+                                    ),
+                                    onChanged: authNotifier.setCallsign,
+                                  ),
+                                  const SizedBox(height: 14),
+                                ],
+
+                                // Error Banner if any
+                                if (authState.errorMessage != null) ...[
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.alertCritical.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: AppColors.alertCritical.withValues(alpha: 0.3)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.error_outline, color: AppColors.alertCritical, size: 18),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            authState.errorMessage!,
+                                            style: AppTypography.bodySm.copyWith(
+                                              color: AppColors.alertCritical,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                ],
+
+                                // Submit Button
                                 SizedBox(
                                   width: double.infinity,
                                   height: 48,
                                   child: ElevatedButton(
                                     onPressed: authState.isLoading
                                         ? null
-                                        : () => authNotifier.requestOtp(),
+                                        : () {
+                                            if (authNotifier.isSignUpMode) {
+                                              authNotifier.signUp(
+                                                email: _emailController.text,
+                                                password: _passwordController.text,
+                                                callsign: _callsignController.text,
+                                              );
+                                            } else {
+                                              authNotifier.signIn(
+                                                email: _emailController.text,
+                                                password: _passwordController.text,
+                                              );
+                                            }
+                                          },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: AppColors.primary,
                                       foregroundColor: AppColors.onPrimary,
@@ -233,27 +398,22 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                         : Row(
                                             mainAxisAlignment: MainAxisAlignment.center,
                                             children: [
-                                              Text('Continue with OTP', style: AppTypography.labelLg.copyWith(color: Colors.white)),
+                                              Text(
+                                                authNotifier.isSignUpMode ? 'Register Pilot with AWS' : 'Sign In to AWS',
+                                                style: AppTypography.labelLg.copyWith(color: Colors.white),
+                                              ),
                                               const SizedBox(width: 8),
                                               const Icon(Icons.arrow_forward, size: 18),
                                             ],
                                           ),
                                   ),
                                 ),
-
-                                if (authState.errorMessage != null) ...[
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    authState.errorMessage!,
-                                    style: AppTypography.bodySm.copyWith(color: AppColors.alertCritical),
-                                  ),
-                                ],
                               ],
                             ),
                           ),
                           const SizedBox(height: 16),
 
-                          // Identity Setup Staging Card
+                          // Vehicle and Telemetry Staging Card
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
@@ -268,30 +428,21 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Expanded(
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 26,
-                                            height: 26,
-                                            decoration: BoxDecoration(
-                                              color: AppColors.primary.withValues(alpha: 0.1),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(Icons.tune, size: 15, color: AppColors.primary),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 26,
+                                          height: 26,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary.withValues(alpha: 0.1),
+                                            shape: BoxShape.circle,
                                           ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              'Identity Setup Flow',
-                                              style: AppTypography.labelLg,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                          child: const Icon(Icons.motorcycle, size: 15, color: AppColors.primary),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text('Convoy Profile', style: AppTypography.labelLg),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
@@ -299,7 +450,7 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                         borderRadius: AppTheme.radiusFull,
                                       ),
                                       child: Text(
-                                        'Telemetry Staging',
+                                        'Rider Metadata',
                                         style: AppTypography.labelSm.copyWith(color: AppColors.onPrimaryFixedVariant),
                                       ),
                                     ),
@@ -330,66 +481,6 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 16),
-
-                          // DePIN Telemetry Reward Pool Banner
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: AppColors.cardBg.withValues(alpha: 0.9),
-                              borderRadius: AppTheme.radiusFull,
-                              boxShadow: AppTheme.elevationLevel1,
-                              border: Border.all(color: AppColors.borderSubtle),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.toll, size: 20, color: AppColors.secondary),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'Convoy Reward Pool',
-                                          style: AppTypography.labelSm,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.secondaryContainer.withValues(alpha: 0.3),
-                                    borderRadius: AppTheme.radiusFull,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 6,
-                                        height: 6,
-                                        decoration: const BoxDecoration(
-                                          color: AppColors.secondary,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        '+4.2 NAV/hr',
-                                        style: AppTypography.labelSm.copyWith(
-                                          color: AppColors.secondary,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                           const SizedBox(height: 24),
                         ],
                       ),
@@ -407,16 +498,16 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                 color: Colors.black.withValues(alpha: 0.65),
                 child: Center(
                   child: OtpVerificationDialog(
-                    phoneOrEmail: authNotifier.phoneOrEmail,
-                    session: authState.session ?? '0x82A1B9E3C1',
+                    phoneOrEmail: authNotifier.email,
+                    session: 'aws-verification',
                     resendCountdown: authState.resendCountdown,
                     isLoading: authState.isLoading,
                     errorMessage: authState.errorMessage,
                     onVerify: (code) async {
-                      await authNotifier.verifyOtp(code);
+                      await authNotifier.confirmSignUp(code);
                     },
                     onResend: () async {
-                      await authNotifier.requestOtp();
+                      await authNotifier.resendConfirmationCode();
                     },
                     onCancel: authNotifier.cancelOtp,
                   ),

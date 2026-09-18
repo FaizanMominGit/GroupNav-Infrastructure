@@ -11,6 +11,7 @@ class ClientConfig {
   final DataConfig data;
   final ComputeConfig compute;
   final CicdConfig cicd;
+  final PacksConfig packs;
 
   const ClientConfig({
     required this.region,
@@ -21,6 +22,7 @@ class ClientConfig {
     required this.data,
     required this.compute,
     required this.cicd,
+    this.packs = const PacksConfig(tableName: 'groupnav-packs'),
   });
 
   factory ClientConfig.fromJson(Map<String, dynamic> json) {
@@ -33,6 +35,7 @@ class ClientConfig {
       data: DataConfig.fromJson(json['data'] as Map<String, dynamic>? ?? {}),
       compute: ComputeConfig.fromJson(json['compute'] as Map<String, dynamic>? ?? {}),
       cicd: CicdConfig.fromJson(json['cicd'] as Map<String, dynamic>? ?? {}),
+      packs: PacksConfig.fromJson(json['packs'] as Map<String, dynamic>? ?? {}),
     );
   }
 
@@ -40,6 +43,18 @@ class ClientConfig {
     final rawString = await rootBundle.loadString(path);
     final jsonMap = json.decode(rawString) as Map<String, dynamic>;
     return ClientConfig.fromJson(jsonMap);
+  }
+}
+
+class PacksConfig {
+  final String tableName;
+
+  const PacksConfig({required this.tableName});
+
+  factory PacksConfig.fromJson(Map<String, dynamic> json) {
+    return PacksConfig(
+      tableName: json['tableName'] as String? ?? 'groupnav-packs',
+    );
   }
 }
 

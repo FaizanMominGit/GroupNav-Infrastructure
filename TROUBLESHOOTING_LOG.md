@@ -468,8 +468,46 @@ When an issue, error, or unexpected behavior is encountered, document it using t
   4. Regenerated client configuration with `npm run export-config` and validated end-to-end telemetry ingestion with `npx tsx scripts/verify-phase3.ts`.
 - **Verification**:
   All 15 CloudFormation resources in `ComputeStack` deployed in `CREATE_COMPLETE`. End-to-end Phase 3 verification test passed cleanly, and all 35 Jest unit tests passed (6/6 test suites).
+### [ISSUE-023] CloudFormation IAM Policy Construct ID Collision During AuthStack Expansion
+- **Date & Phase**: 2026-09-18 | Real AWS Integration (Zero Placeholders)
+- **Component / Command**: `npx cdk deploy AuthStack` / `lib/auth-stack.ts`
+- **Symptom / Error Message**:
+  ```
+  Resource handler returned message: "Policy GroupNavRiderIotPolicy already exists." (RequestToken: ..., HandlerErrorCode: AlreadyExists)
+  AuthStack | UPDATE_FAILED | AWS::IAM::ManagedPolicy
+  ```
+- **Root Cause Analysis**:
+  When expanding IAM permissions for DynamoDB (`groupnav-packs`) and IoT Core MQTT topics, renaming the CDK construct ID from `RiderIotTelemetryPolicy` to `RiderIotAndDynamoPolicy` while specifying the same explicit `managedPolicyName: 'GroupNavRiderIotPolicy'` caused CloudFormation to synthesize a new resource logical ID. CloudFormation attempts to create the new managed policy before deleting the old one, resulting in a name conflict error (`AlreadyExists`).
+- **Fix / Solution Applied**:
+  Retained the original construct ID `RiderIotTelemetryPolicy` with the updated policy statements (adding `dynamodb:*` on `groupnav-packs` and expanding IoT Core action topics). CloudFormation performed an in-place update on the existing managed policy without naming conflicts.
+- **Verification**:
+  `npx cdk deploy AuthStack` succeeded in 32.5s with status `UPDATE_COMPLETE`, updating the IAM Managed Policy and creating the DynamoDB table `groupnav-packs`.
 - **Prevention Rule**:
-  Before redeploying stacks with explicit log group naming after a teardown, verify that the corresponding CloudWatch Log Groups have been pruned or set retention policies that do not collide during re-provisioning.
+  Never alter the CDK construct ID of an IAM role or policy that has an explicit physical name (`roleName` / `managedPolicyName`) in an existing CloudFormation stack, as CloudFormation treats ID changes as resource replacements.
+
+---
+
+### [ISSUE-024] Test Suite Assertion Failures Following Purge of Hardcoded Mock State
+- **Date & Phase**: 2026-09-18 | Real AWS Mobile Integration (Phase 4 / Step 7)
+- **Component / Command**: `flutter test` in `mobile/`
+- **Symptom / Error Message**:
+  ```
+  Failing tests:
+    test/pack_test.dart: PackNotifier State Tests joinPack sets isInPack to true (Expected <4>, Actual <1>)
+    test/radar_test.dart: IotTelemetryService createPacket returns valid schema (Expected '804', Actual 'solo')
+    test/trips_test.dart: TripHistoryNotifier Playback Tests (Expected availableTrips.isNotEmpty == true, Actual false)
+  ```
+- **Root Cause Analysis**:
+  The mobile test suite was originally constructed to assert the behavior of simulated mock harnesses (e.g., hardcoded 4-bike rosters `Apex`, `Viper`, `Ghost`, `Nomad`, default room `804`, and pre-populated mock trips). When all simulated ticker loops and fake data were completely purged in favor of real AWS Cognito, DynamoDB, and IoT Core connectivity, the baseline state legitimately changed to zero (Solo ride, 0 remote peers, 0 recorded trips).
+- **Fix / Solution Applied**:
+  1. Updated `mobile/test/pack_test.dart` to assert the true Solo Ride baseline (`members.length == 1`, user only) and verified async join/leave transitions.
+  2. Updated `mobile/test/radar_test.dart` to verify that unjoined telemetry streams default to `packId: 'solo'`, and dynamically adopt the joined convoy code via `updateActivePack`.
+  3. Updated `mobile/test/trips_test.dart` to verify empty initial trip history (`availableTrips.isEmpty`) and test playback scrubber actions against actively selected trip recordings.
+- **Verification**:
+  All 57 unit tests passed cleanly (`flutter test`, 100% pass rate) and `flutter analyze` completed with 0 errors, 0 warnings, and 0 lints.
+- **Prevention Rule**:
+  When transitioning a client from simulation/mock prototypes to genuine cloud-connected architectures, audit test assertions so they validate authentic cloud lifecycle states and empty initialization boundaries rather than synthetic mock fixtures.
+
 
 
 

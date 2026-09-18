@@ -110,12 +110,13 @@ void main() {
       telemetryService.dispose();
     });
 
-    test('Initializes with standard pack formation #804 and GN-9482 code', () {
-      expect(packNotifier.state.packId, equals('804'));
-      expect(packNotifier.state.packCode, equals('GN-9482'));
-      expect(packNotifier.state.isTelemetrySyncActive, isTrue);
-      expect(packNotifier.state.members.length, equals(4));
-      expect(packNotifier.state.geofenceRadiusMeters, equals(850.0));
+    test('Initializes cleanly in Solo Ride Mode with 0 fake peers', () {
+      expect(packNotifier.state.packId, equals(''));
+      expect(packNotifier.state.packCode, equals(''));
+      expect(packNotifier.state.isTelemetrySyncActive, isFalse);
+      expect(packNotifier.state.isInPack, isFalse);
+      expect(packNotifier.state.members.length, equals(1));
+      expect(packNotifier.state.members.first.isLeader, isTrue);
     });
 
     test('updateGeofenceRadius updates formation and syncs to RadarNotifier', () {
@@ -132,12 +133,12 @@ void main() {
       expect(packNotifier.state.geofenceRadiusMeters, equals(5000.0));
     });
 
-    test('generateQrPayload produces valid JSON with correct pack rendezvous data', () {
+    test('generateQrPayload produces valid JSON with correct pack rendezvous data', () async {
+      await packNotifier.joinPack('GN-9482');
       final payload = packNotifier.generateQrPayload();
       final map = jsonDecode(payload) as Map<String, dynamic>;
       expect(map['action'], equals('join_pack'));
       expect(map['code'], equals('GN-9482'));
-      expect(map['packId'], equals('804'));
       expect(map.containsKey('timestamp'), isTrue);
     });
 
@@ -149,9 +150,11 @@ void main() {
       expect(packNotifier.state.members.first.isLeader, isTrue);
     });
 
-    test('leavePack sets isInPack to false and clears packCode', () {
+    test('leavePack sets isInPack to false and clears packCode', () async {
+      await packNotifier.joinPack('GN-7721');
       expect(packNotifier.state.isInPack, isTrue);
-      packNotifier.leavePack();
+
+      await packNotifier.leavePack();
       expect(packNotifier.state.isInPack, isFalse);
       expect(packNotifier.state.packCode, isEmpty);
       expect(packNotifier.state.title, equals('Solo Ride Mode'));
@@ -160,16 +163,15 @@ void main() {
       expect(packNotifier.state.members.first.callsign, equals('Apex (You)'));
     });
 
-    test('joinPack sets isInPack to true and updates packCode', () {
-      packNotifier.leavePack();
+    test('joinPack sets isInPack to true and updates packCode', () async {
+      await packNotifier.leavePack();
       expect(packNotifier.state.isInPack, isFalse);
 
-      packNotifier.joinPack('GN-7721');
+      await packNotifier.joinPack('GN-7721');
       expect(packNotifier.state.isInPack, isTrue);
       expect(packNotifier.state.packCode, equals('GN-7721'));
       expect(packNotifier.state.title, equals('Pack Formation #GN-7721'));
       expect(packNotifier.state.isTelemetrySyncActive, isTrue);
-      expect(packNotifier.state.members.length, equals(4));
     });
 
     test('joinPack parses full QR JSON pairing payload accurately', () {

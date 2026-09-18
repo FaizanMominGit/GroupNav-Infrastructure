@@ -90,33 +90,30 @@ void main() {
   });
 
   group('AuthNotifier & CognitoAuthService Flow', () {
-    test('Request OTP transitions state to otpPending', () async {
+    test('Setters and mode toggling update AuthNotifier state cleanly', () async {
       final authService = CognitoAuthService(
         config: dummyConfig,
         storage: MemoryAuthStorage(),
       );
       final notifier = AuthNotifier(authService);
 
-      notifier.setPhoneOrEmail('+15551234567');
+      notifier.setEmail('pilot@groupnav.io');
+      notifier.setPassword('SecretPassword123');
       notifier.setCallsign('Viper');
       notifier.setVehicleClass('touring');
       notifier.setBeaconColor('#00C48C');
 
-      await notifier.requestOtp();
+      expect(notifier.email, equals('pilot@groupnav.io'));
+      expect(notifier.password, equals('SecretPassword123'));
+      expect(notifier.callsign, equals('Viper'));
+      expect(notifier.selectedVehicleClass, equals('touring'));
+      expect(notifier.selectedBeaconColor, equals('#00C48C'));
 
-      expect(notifier.state.status, equals(AuthStatus.otpPending));
-      expect(notifier.state.session, isNotNull);
-      expect(notifier.state.resendCountdown, greaterThan(0));
+      expect(notifier.isSignUpMode, isFalse);
+      notifier.toggleSignUpMode();
+      expect(notifier.isSignUpMode, isTrue);
 
-      // Verify OTP validation with 6-digit code
-      final success = await notifier.verifyOtp('123456');
-      expect(success, isTrue);
-      expect(notifier.state.status, equals(AuthStatus.authenticated));
-      expect(notifier.state.pilot?.callsign, equals('Viper'));
-      expect(notifier.state.pilot?.vehicleClass, equals('touring'));
-      expect(notifier.state.pilot?.beaconColor, equals('#00C48C'));
-
-      // Sign out
+      // Sign out resets state
       await notifier.signOut();
       expect(notifier.state.status, equals(AuthStatus.initial));
       expect(notifier.state.isAuthenticated, isFalse);

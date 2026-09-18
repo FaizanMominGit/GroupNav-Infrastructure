@@ -370,15 +370,29 @@ class PackManagementScreen extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        packNotifier.createPack();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Created new Convoy Room! You are the Convoy Lead.'),
-                            backgroundColor: AppColors.primary,
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
+                      onPressed: () async {
+                        try {
+                          await packNotifier.createPack();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Created new Convoy Room on AWS! You are Convoy Lead.'),
+                                backgroundColor: AppColors.primary,
+                                duration: Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to create convoy on AWS: ${e.toString().replaceAll("Exception: ", "")}'),
+                                backgroundColor: AppColors.alertCritical,
+                                duration: const Duration(seconds: 4),
+                              ),
+                            );
+                          }
+                        }
                       },
                       icon: const Icon(Icons.add_circle_outline, size: 18, color: Colors.white),
                       label: const Text('Create Convoy'),
@@ -457,15 +471,17 @@ class PackManagementScreen extends ConsumerWidget {
             child: Text('Cancel', style: AppTypography.labelMd.copyWith(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
-            onPressed: () {
-              notifier.leavePack();
-              Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Exited convoy room. Now in Solo Ride Mode.'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
+            onPressed: () async {
+              await notifier.leavePack();
+              if (ctx.mounted) {
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Exited convoy room. Now in Solo Ride Mode.'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.alertCritical,
@@ -480,6 +496,9 @@ class PackManagementScreen extends ConsumerWidget {
 
   void _showJoinPackDialog(BuildContext context, PackNotifier notifier) {
     final controller = TextEditingController(text: 'GN-');
+    String? localError;
+    bool isJoining = false;
+
     showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -507,6 +526,7 @@ class PackManagementScreen extends ConsumerWidget {
                   controller: controller,
                   autofocus: true,
                   textCapitalization: TextCapitalization.characters,
+                  enabled: !isJoining,
                   style: AppTypography.telemetryNum.copyWith(
                     fontSize: 16,
                     letterSpacing: 1.2,
@@ -526,18 +546,28 @@ class PackManagementScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+                if (localError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    localError!,
+                    style: AppTypography.bodySm.copyWith(color: AppColors.alertCritical),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton.icon(
-                    onPressed: () async {
-                      final data = await Clipboard.getData(Clipboard.kTextPlain);
-                      if (data?.text != null && data!.text!.trim().isNotEmpty) {
-                        setState(() {
-                          controller.text = data.text!.trim();
-                        });
-                      }
-                    },
+                    onPressed: isJoining
+                        ? null
+                        : () async {
+                            final data = await Clipboard.getData(Clipboard.kTextPlain);
+                            if (data?.text != null && data!.text!.trim().isNotEmpty) {
+                              setState(() {
+                                controller.text = data.text!.trim();
+                                localError = null;
+                              });
+                            }
+                          },
                     icon: const Icon(Icons.paste, size: 14, color: AppColors.secondary),
                     label: Text(
                       'Paste Clipboard Data',
@@ -552,29 +582,56 @@ class PackManagementScreen extends ConsumerWidget {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
+                onPressed: isJoining ? null : () => Navigator.of(ctx).pop(),
                 child: Text('Cancel', style: AppTypography.labelMd.copyWith(color: AppColors.textSecondary)),
               ),
               ElevatedButton(
-                onPressed: () {
-                  final code = controller.text.trim();
-                  if (code.isNotEmpty && code != 'GN-') {
-                    notifier.joinPack(code);
-                    Navigator.of(ctx).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Joined Convoy Room "$code"!'),
-                        backgroundColor: AppColors.primary,
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  }
-                },
+                onPressed: isJoining
+                    ? null
+                    : () async {
+                        final code = controller.text.trim();
+                        if (code.isEmpty || code == 'GN-') {
+                          setState(() {
+                            localError = 'Please enter a valid room code.';
+                          });
+                          return;
+                        }
+
+                        setState(() {
+                          isJoining = true;
+                          localError = null;
+                        });
+
+                        try {
+                          await notifier.joinPack(code);
+                          if (ctx.mounted) {
+                            Navigator.of(ctx).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Successfully joined Convoy Room "$code" on AWS!'),
+                                backgroundColor: AppColors.primary,
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          setState(() {
+                            isJoining = false;
+                            localError = e.toString().replaceAll('Exception: ', '');
+                          });
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('Join'),
+                child: isJoining
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Join Room'),
               ),
             ],
           );

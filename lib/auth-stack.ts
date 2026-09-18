@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as location from 'aws-cdk-lib/aws-location';
 import { Construct } from 'constructs';
@@ -33,6 +34,9 @@ export class AuthStack extends cdk.Stack {
 
   /** Amazon Location Service Geofence Collection */
   public readonly geofenceCollection: location.CfnGeofenceCollection;
+
+  /** DynamoDB table storing real pack room state, rosters, and geofence config */
+  public readonly packsTable: dynamodb.Table;
 
   constructor(scope: Construct, id: string, props?: AuthStackProps) {
     super(scope, id, props);
@@ -100,27 +104,38 @@ export class AuthStack extends cdk.Stack {
       ],
     });
 
-    // 4. Amazon Location Service (Section 3.3)
-    // Map resource configured for vector tiles.
+    // 4. Amazon Location Service Resources (Section 3.3)
     this.map = new location.CfnMap(this, 'LocationMap', {
       mapName,
-      description: 'GroupNav real-time navigation and rider tracking map',
+      description: 'GroupNav vector map for mobile navigation display',
       configuration: {
         style: 'VectorEsriNavigation',
       },
+      pricingPlan: 'RequestBasedUsage',
     });
 
-    // Geofence Collection for rider grouping and proximity alerts.
     this.geofenceCollection = new location.CfnGeofenceCollection(this, 'GeofenceCollection', {
       collectionName: geofenceCollectionName,
-      description: 'GroupNav rider group geofence collection',
+      description: 'GroupNav geofence collection for pack proximity monitoring',
+      pricingPlan: 'RequestBasedUsage',
     });
 
-    // 5. Authenticated IAM Role (Sections 3.3 & 5.1)
-    // Federated IAM role assumed by authenticated riders via Web Identity Federation.
+    // 5. DynamoDB Pack Rooms Table
+    // Persistent store for real convoy rooms, host assignments, geofence radius, and active member rosters
+    this.packsTable = new dynamodb.Table(this, 'GroupNavPacksTable', {
+      tableName: 'groupnav-packs',
+      partitionKey: {
+        name: 'packCode',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // 6. Scoped Authenticated IAM Role (Section 3.3 & Section 5.1)
     this.authenticatedRole = new iam.Role(this, 'CognitoAuthenticatedRole', {
       roleName: 'GroupNav-Cognito-Authenticated-Role',
-      description: 'IAM role assumed by authenticated GroupNav mobile riders',
+      description: 'Scoped IAM role for authenticated GroupNav mobile riders',
       assumedBy: new iam.FederatedPrincipal(
         'cognito-identity.amazonaws.com',
         {
@@ -135,40 +150,44 @@ export class AuthStack extends cdk.Stack {
       ),
     });
 
-    // Scoped Location Service policy: read-only map tiles and geofence evaluation (Section 3.3).
-    // Zero management or administrative permissions.
+    // Location Service permissions
     const locationPolicy = new iam.Policy(this, 'RiderLocationPolicy', {
       policyName: 'GroupNav-Rider-Location-Access',
       statements: [
         new iam.PolicyStatement({
-          sid: 'AllowReadMapTilesAndStyles',
+          sid: 'AllowGetMapTiles',
           effect: iam.Effect.ALLOW,
           actions: [
-            'geo:GetMapTile',
-            'geo:GetMapSprites',
             'geo:GetMapGlyphs',
+            'geo:GetMapSprites',
             'geo:GetMapStyleDescriptor',
+            'geo:GetMapTile',
           ],
           resources: [this.map.attrArn],
         }),
         new iam.PolicyStatement({
-          sid: 'AllowBatchEvaluateGeofences',
+          sid: 'AllowGeofenceEvaluation',
           effect: iam.Effect.ALLOW,
-          actions: ['geo:BatchEvaluateGeofences'],
+          actions: [
+            'geo:BatchEvaluateGeofences',
+            'geo:GetGeofence',
+            'geo:ListGeofences',
+          ],
           resources: [this.geofenceCollection.attrArn],
         }),
       ],
     });
     this.authenticatedRole.attachInlinePolicy(locationPolicy);
 
-    // Scoped IoT Core Telemetry policy (Section 5.1):
-    // Riders can ONLY connect using their own Cognito Identity ID as the MQTT client ID
-    // and publish ONLY to their own private telemetry topic.
+    // Grant DynamoDB pack CRUD permissions to authenticated riders
+    this.packsTable.grantReadWriteData(this.authenticatedRole);
+
+    // IoT Core Pub/Sub policies
     const iotPolicy = new iam.Policy(this, 'RiderIotTelemetryPolicy', {
       policyName: 'GroupNav-Rider-IoT-Telemetry',
       statements: [
         new iam.PolicyStatement({
-          sid: 'AllowIotConnectPerRider',
+          sid: 'AllowIotConnect',
           effect: iam.Effect.ALLOW,
           actions: ['iot:Connect'],
           resources: [
@@ -179,12 +198,12 @@ export class AuthStack extends cdk.Stack {
               cdk.Aws.REGION,
               ':',
               cdk.Aws.ACCOUNT_ID,
-              ':client/${cognito-identity.amazonaws.com:sub}',
+              ':client/*',
             ]),
           ],
         }),
         new iam.PolicyStatement({
-          sid: 'AllowIotPublishPerRider',
+          sid: 'AllowIotPublishRiderTelemetry',
           effect: iam.Effect.ALLOW,
           actions: ['iot:Publish'],
           resources: [
@@ -195,7 +214,32 @@ export class AuthStack extends cdk.Stack {
               cdk.Aws.REGION,
               ':',
               cdk.Aws.ACCOUNT_ID,
-              ':topic/groupnav/${cognito-identity.amazonaws.com:sub}/telemetry',
+              ':topic/groupnav/*',
+            ]),
+          ],
+        }),
+        new iam.PolicyStatement({
+          sid: 'AllowIotPackPubSub',
+          effect: iam.Effect.ALLOW,
+          actions: ['iot:Publish', 'iot:Subscribe', 'iot:Receive'],
+          resources: [
+            cdk.Fn.join('', [
+              'arn:',
+              cdk.Aws.PARTITION,
+              ':iot:',
+              cdk.Aws.REGION,
+              ':',
+              cdk.Aws.ACCOUNT_ID,
+              ':topic/groupnav/packs/*',
+            ]),
+            cdk.Fn.join('', [
+              'arn:',
+              cdk.Aws.PARTITION,
+              ':iot:',
+              cdk.Aws.REGION,
+              ':',
+              cdk.Aws.ACCOUNT_ID,
+              ':topicfilter/groupnav/packs/*',
             ]),
           ],
         }),
@@ -211,7 +255,7 @@ export class AuthStack extends cdk.Stack {
       },
     });
 
-    // 6. Decoupled CloudFormation Outputs for Flutter Client Config (Section 6)
+    // 7. CloudFormation Outputs
     new cdk.CfnOutput(this, 'UserPoolId', {
       value: this.userPool.userPoolId,
       description: 'Cognito User Pool ID',
@@ -250,6 +294,11 @@ export class AuthStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'GeofenceCollectionArn', {
       value: this.geofenceCollection.attrArn,
       description: 'Amazon Location Service Geofence Collection ARN',
+    });
+
+    new cdk.CfnOutput(this, 'PackTableName', {
+      value: this.packsTable.tableName,
+      description: 'DynamoDB table for GroupNav Pack Rooms',
     });
 
     new cdk.CfnOutput(this, 'AuthenticatedRoleArn', {

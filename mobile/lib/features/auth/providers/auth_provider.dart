@@ -23,22 +23,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final CognitoAuthService _authService;
   Timer? _countdownTimer;
 
-  String _phoneOrEmail = '+1 (555) 438-9201';
-  String _callsign = '0xApex';
+  String _email = '';
+  String _password = '';
+  String _callsign = 'Apex';
   String _selectedVehicleClass = 'sportbike';
   String _selectedBeaconColor = '#0066FF';
+  bool _isSignUpMode = false;
 
   AuthNotifier(this._authService) : super(const AuthState()) {
     checkSavedSession();
   }
 
-  String get phoneOrEmail => _phoneOrEmail;
+  String get email => _email;
+  String get password => _password;
   String get callsign => _callsign;
   String get selectedVehicleClass => _selectedVehicleClass;
   String get selectedBeaconColor => _selectedBeaconColor;
+  bool get isSignUpMode => _isSignUpMode;
 
-  void setPhoneOrEmail(String value) => _phoneOrEmail = value;
-  void setCallsign(String value) => _callsign = value;
+  void setEmail(String value) => _email = value.trim();
+  void setPassword(String value) => _password = value;
+  void setCallsign(String value) => _callsign = value.trim();
+  void toggleSignUpMode() {
+    _isSignUpMode = !_isSignUpMode;
+    state = state.copyWith(errorMessage: null);
+  }
 
   void setVehicleClass(String value) {
     _selectedVehicleClass = value;
@@ -60,55 +69,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Check if an authenticated pilot session already exists in device secure storage
   Future<void> checkSavedSession() async {
-    final savedPilot = await _authService.restoreSession();
-    if (savedPilot != null) {
-      final creds = await _authService.getCachedCredentials();
-      state = state.copyWith(
-        status: AuthStatus.authenticated,
-        pilot: savedPilot,
-        awsCredentials: creds,
-      );
-    }
-  }
-
-  /// Request OTP from Cognito
-  Future<void> requestOtp() async {
-    if (_phoneOrEmail.trim().isEmpty) {
-      state = state.copyWith(
-        status: AuthStatus.error,
-        errorMessage: 'Please enter pilot phone or email.',
-      );
-      return;
-    }
-
-    state = state.copyWith(status: AuthStatus.authenticating, errorMessage: null);
-
     try {
-      final result = await _authService.initiateAuth(
-        phoneOrEmail: _phoneOrEmail,
-        callsign: _callsign,
-      );
-
-      _startResendTimer(45);
-
-      state = state.copyWith(
-        status: AuthStatus.otpPending,
-        session: result['session'] as String?,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        status: AuthStatus.error,
-        errorMessage: e.toString(),
-      );
-    }
+      final savedPilot = await _authService.restoreSession();
+      if (savedPilot != null) {
+        final creds = await _authService.getCachedCredentials();
+        state = state.copyWith(
+          status: AuthStatus.authenticated,
+          pilot: savedPilot,
+          awsCredentials: creds,
+        );
+      }
+    } catch (_) {}
   }
 
-  /// Verify entered 6-digit OTP
-  Future<bool> verifyOtp(String code) async {
-    if (code.length != 6) {
+  /// Sign up with AWS Cognito User Pool
+  Future<bool> signUp({
+    required String email,
+    required String password,
+    required String callsign,
+  }) async {
+    _email = email.trim();
+    _password = password;
+    _callsign = callsign.trim();
+
+    if (_email.isEmpty || _password.isEmpty || _callsign.isEmpty) {
       state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: 'Please enter a valid 6-digit code.',
+        errorMessage: 'Please enter email, password, and callsign.',
       );
       return false;
     }
@@ -116,10 +103,84 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(status: AuthStatus.authenticating, errorMessage: null);
 
     try {
-      final result = await _authService.verifyOtp(
-        phoneOrEmail: _phoneOrEmail,
-        otpCode: code,
-        session: state.session ?? '0x82A1B9E3C1',
+      final result = await _authService.signUp(
+        email: _email,
+        password: _password,
+        callsign: _callsign,
+      );
+
+      final isConfirmed = result['userConfirmed'] as bool? ?? false;
+      if (isConfirmed) {
+        // Automatically sign in if auto-confirmed
+        return await signIn(email: _email, password: _password);
+      } else {
+        _startResendTimer(60);
+        state = state.copyWith(
+          status: AuthStatus.otpPending,
+          errorMessage: null,
+        );
+        return true;
+      }
+    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
+  /// Confirm sign up using the 6-digit confirmation code from email
+  Future<bool> confirmSignUp(String code) async {
+    if (code.trim().length != 6) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Please enter the 6-digit code sent to your email.',
+      );
+      return false;
+    }
+
+    state = state.copyWith(status: AuthStatus.authenticating, errorMessage: null);
+
+    try {
+      await _authService.confirmSignUp(
+        email: _email,
+        confirmationCode: code.trim(),
+      );
+
+      // Successfully confirmed, proceed to sign in with credentials
+      return await signIn(email: _email, password: _password);
+    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.otpPending,
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
+  /// Sign in with AWS Cognito User Pool and acquire real AWS temporary credentials
+  Future<bool> signIn({
+    required String email,
+    required String password,
+  }) async {
+    _email = email.trim();
+    _password = password;
+
+    if (_email.isEmpty || _password.isEmpty) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: 'Please enter email and password.',
+      );
+      return false;
+    }
+
+    state = state.copyWith(status: AuthStatus.authenticating, errorMessage: null);
+
+    try {
+      final result = await _authService.signIn(
+        email: _email,
+        password: _password,
         callsign: _callsign,
         vehicleClass: _selectedVehicleClass,
         beaconColor: _selectedBeaconColor,
@@ -131,14 +192,38 @@ class AuthNotifier extends StateNotifier<AuthState> {
         status: AuthStatus.authenticated,
         pilot: result['pilot'] as PilotProfile?,
         awsCredentials: result['awsCredentials'] as Map<String, String>?,
+        errorMessage: null,
       );
       return true;
     } catch (e) {
-      state = state.copyWith(
-        status: AuthStatus.otpPending,
-        errorMessage: 'Invalid OTP. Please try again.',
-      );
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      if (msg.contains('UserNotConfirmedException')) {
+        // Needs confirmation
+        _startResendTimer(60);
+        state = state.copyWith(
+          status: AuthStatus.otpPending,
+          errorMessage: 'Account not yet confirmed. Please enter the verification code sent to your email.',
+        );
+      } else {
+        state = state.copyWith(
+          status: AuthStatus.error,
+          errorMessage: msg,
+        );
+      }
       return false;
+    }
+  }
+
+  /// Resend confirmation code
+  Future<void> resendConfirmationCode() async {
+    if (_email.isEmpty) return;
+    try {
+      await _authService.resendConfirmationCode(email: _email);
+      _startResendTimer(60);
+    } catch (e) {
+      state = state.copyWith(
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      );
     }
   }
 

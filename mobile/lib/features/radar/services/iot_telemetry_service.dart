@@ -10,27 +10,20 @@ import '../../../core/services/location_service.dart';
 import '../models/convoy_peer.dart';
 import '../models/telemetry_packet.dart';
 
-/// Simulated Waypoint Coordinates along "Skyline Summit" (matching mockups)
-final List<LatLng> kSkylineSummitRoute = [
-  const LatLng(37.7680, -122.4280),
-  const LatLng(37.7705, -122.4255),
-  const LatLng(37.7730, -122.4225),
-  const LatLng(37.7749, -122.4194), // Center checkpoint
-  const LatLng(37.7780, -122.4150),
-  const LatLng(37.7815, -122.4110),
-  const LatLng(37.7850, -122.4070),
-];
-
 class IotTelemetryService {
   final ClientConfig config;
   final LocationService? locationService;
   final AwsSigV4Signer _signer;
 
   bool _isBroadcasting = true;
-  Timer? _telemetryTicker;
   StreamSubscription<PositionData>? _locationSub;
   MqttServerClient? _mqttClient;
   bool _isMqttConnected = false;
+  String _currentRiderId = 'pilot';
+  String _currentCallsign = 'Apex';
+  String _activePackCode = '';
+
+  final Map<String, ConvoyPeer> _activePeers = {};
 
   final _telemetryController = StreamController<List<ConvoyPeer>>.broadcast();
   Stream<List<ConvoyPeer>> get convoyStream => _telemetryController.stream;
@@ -38,13 +31,11 @@ class IotTelemetryService {
   final _alertController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get alertStream => _alertController.stream;
 
+  final _connectionStatusController = StreamController<bool>.broadcast();
+  Stream<bool> get connectionStatusStream => _connectionStatusController.stream;
+
   bool get isBroadcasting => _isBroadcasting;
   bool get isMqttConnected => _isMqttConnected;
-
-  // Base simulation state
-  double _progress = 0.5;
-  final double _speedKmh = 78.0;
-  final double _headingDeg = 42.0;
 
   IotTelemetryService({
     required this.config,
@@ -53,7 +44,34 @@ class IotTelemetryService {
           region: config.region,
           endpoint: config.iot.endpoint,
         ) {
-    startTelemetry();
+    _startLocationStreaming();
+  }
+
+  void updateRiderIdentity({required String riderId, required String callsign}) {
+    _currentRiderId = riderId;
+    _currentCallsign = callsign;
+  }
+
+  void updateActivePack(String packCode) {
+    if (_activePackCode == packCode) return;
+    final previousPack = _activePackCode;
+    _activePackCode = packCode;
+
+    // Clear remote peers from previous pack
+    _activePeers.removeWhere((id, _) => id != _currentRiderId);
+    _emitPeers();
+
+    // Re-subscribe if connected
+    if (_mqttClient != null && _isMqttConnected) {
+      if (previousPack.isNotEmpty) {
+        _mqttClient!.unsubscribe('groupnav/packs/$previousPack/telemetry');
+        _mqttClient!.unsubscribe('groupnav/packs/$previousPack/alerts');
+      }
+      if (_activePackCode.isNotEmpty) {
+        _mqttClient!.subscribe('groupnav/packs/$_activePackCode/telemetry', MqttQos.atLeastOnce);
+        _mqttClient!.subscribe('groupnav/packs/$_activePackCode/alerts', MqttQos.atLeastOnce);
+      }
+    }
   }
 
   /// Initialize connection to AWS IoT Core MQTT Broker over WebSockets
@@ -91,18 +109,29 @@ class IotTelemetryService {
       if (status?.state == MqttConnectionState.connected) {
         _mqttClient = client;
         _isMqttConnected = true;
+        _connectionStatusController.add(true);
         debugPrint('[IotTelemetryService] AWS IoT Core MQTT connected successfully.');
 
-        // Subscribe to pack alerts
-        client.subscribe('groupnav/packs/+/alerts', MqttQos.atLeastOnce);
+        // Subscribe to global and pack-specific telemetry and alerts
+        client.subscribe('groupnav/+/telemetry', MqttQos.atLeastOnce);
+        if (_activePackCode.isNotEmpty) {
+          client.subscribe('groupnav/packs/$_activePackCode/telemetry', MqttQos.atLeastOnce);
+          client.subscribe('groupnav/packs/$_activePackCode/alerts', MqttQos.atLeastOnce);
+        }
 
         client.updates?.listen((List<MqttReceivedMessage<MqttMessage>> messages) {
           for (final msg in messages) {
             final recMess = msg.payload as MqttPublishMessage;
             final payloadStr = MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
+
             try {
               final jsonMap = jsonDecode(payloadStr) as Map<String, dynamic>;
-              _alertController.add(jsonMap);
+
+              if (msg.topic.contains('/alerts')) {
+                _alertController.add(jsonMap);
+              } else if (msg.topic.contains('/telemetry')) {
+                _handleIncomingTelemetry(jsonMap);
+              }
             } catch (_) {}
           }
         });
@@ -114,36 +143,44 @@ class IotTelemetryService {
     }
 
     _isMqttConnected = false;
+    _connectionStatusController.add(false);
     return false;
+  }
+
+  void _handleIncomingTelemetry(Map<String, dynamic> data) {
+    try {
+      final packet = TelemetryPacket.fromJson(data);
+      if (packet.riderId == _currentRiderId) return; // Skip self
+
+      final remotePeer = ConvoyPeer(
+        callsign: packet.callsign,
+        latitude: packet.latitude,
+        longitude: packet.longitude,
+        altitude: packet.altitude,
+        speedKmh: packet.speedKmh,
+        headingDeg: packet.headingDeg,
+        relativeOffsetMeters: 0,
+        isLeader: false,
+        beaconColorHex: '#00C48C',
+        monikerTag: 'Rider',
+      );
+
+      _activePeers[packet.riderId] = remotePeer;
+      _emitPeers();
+    } catch (_) {}
   }
 
   void setBroadcasting(bool value) {
     _isBroadcasting = value;
-    if (_isBroadcasting) {
-      startTelemetry();
-    } else {
-      _telemetryTicker?.cancel();
-      _locationSub?.cancel();
-    }
   }
 
-  void startTelemetry() {
-    _telemetryTicker?.cancel();
+  void _startLocationStreaming() {
     _locationSub?.cancel();
+    if (locationService == null) return;
 
-    if (locationService != null && locationService!.mode == LocationMode.hardware) {
-      _startHardwareLocationStreaming();
-    } else {
-      startSimulation();
-    }
-  }
-
-  void _startHardwareLocationStreaming() {
     _locationSub = locationService!.positionStream.listen((pos) {
-      if (!_isBroadcasting) return;
-
-      final leader = ConvoyPeer(
-        callsign: 'Leader: Apex (You)',
+      final selfPeer = ConvoyPeer(
+        callsign: '$_currentCallsign (You)',
         latitude: pos.latitude,
         longitude: pos.longitude,
         altitude: pos.altitude,
@@ -155,93 +192,39 @@ class IotTelemetryService {
         monikerTag: 'HQ',
       );
 
-      _telemetryController.add([leader]);
+      _activePeers[_currentRiderId] = selfPeer;
+      _emitPeers();
 
-      // Publish live telemetry packet to AWS IoT Core topic
-      final packet = createPacket(
-        riderId: 'apex-lead',
-        callsign: 'Apex',
-        position: LatLng(pos.latitude, pos.longitude),
-        speedKmh: pos.speedKmh,
-        headingDeg: pos.headingDeg,
-      );
-      publishTelemetry(packet);
+      if (_isBroadcasting && _isMqttConnected) {
+        final packet = TelemetryPacket(
+          riderId: _currentRiderId,
+          callsign: _currentCallsign,
+          packId: _activePackCode.isNotEmpty ? _activePackCode : 'solo',
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+          altitude: pos.altitude,
+          speedKmh: pos.speedKmh,
+          headingDeg: pos.headingDeg,
+          timestamp: DateTime.now().millisecondsSinceEpoch,
+        );
+        publishTelemetry(packet);
+      }
     });
   }
 
-  void startSimulation() {
-    _telemetryTicker?.cancel();
-    _telemetryTicker = Timer.periodic(const Duration(milliseconds: 1000), (timer) {
-      if (!_isBroadcasting) return;
-
-      _progress = (_progress + 0.005) % 1.0;
-      final currentPos = _interpolatePosition(_progress);
-      final viperPos = _interpolatePosition((_progress + 0.015) % 1.0);
-      final ghostPos = _interpolatePosition((_progress - 0.012 + 1.0) % 1.0);
-
-      final peers = [
-        // 1. Leader (Apex - Flagship Pilot)
-        ConvoyPeer(
-          callsign: 'Leader: Apex',
-          latitude: currentPos.latitude,
-          longitude: currentPos.longitude,
-          altitude: 312.0,
-          speedKmh: _speedKmh,
-          headingDeg: _headingDeg,
-          relativeOffsetMeters: 0,
-          isLeader: true,
-          beaconColorHex: '#0066FF',
-          monikerTag: 'HQ',
-        ),
-
-        // 2. Peer 1: Viper (+120m ahead)
-        ConvoyPeer(
-          callsign: 'Viper',
-          latitude: viperPos.latitude,
-          longitude: viperPos.longitude,
-          altitude: 315.0,
-          speedKmh: 72.0,
-          headingDeg: 38.0,
-          relativeOffsetMeters: 120.0,
-          isLeader: false,
-          beaconColorHex: '#00C48C',
-          monikerTag: '+120m',
-        ),
-
-        // 3. Peer 2: Ghost (-85m trailing)
-        ConvoyPeer(
-          callsign: 'Ghost',
-          latitude: ghostPos.latitude,
-          longitude: ghostPos.longitude,
-          altitude: 308.0,
-          speedKmh: 68.0,
-          headingDeg: 45.0,
-          relativeOffsetMeters: -85.0,
-          isLeader: false,
-          beaconColorHex: '#FF9500',
-          monikerTag: '-85m',
-        ),
-      ];
-
-      _telemetryController.add(peers);
-
-      // Publish packet
-      final packet = createPacket(
-        riderId: 'apex-lead',
-        callsign: 'Apex',
-        position: currentPos,
-        speedKmh: _speedKmh,
-        headingDeg: _headingDeg,
-      );
-      publishTelemetry(packet);
-    });
+  void _emitPeers() {
+    if (_activePeers.isNotEmpty) {
+      _telemetryController.add(_activePeers.values.toList());
+    }
   }
 
-  /// Publish a TelemetryPacket to AWS IoT Core topic: `groupnav/{riderId}/telemetry`
+  /// Publish a TelemetryPacket to AWS IoT Core
   void publishTelemetry(TelemetryPacket packet) {
     if (_mqttClient != null && _isMqttConnected) {
       try {
-        final topic = 'groupnav/${packet.riderId}/telemetry';
+        final topic = _activePackCode.isNotEmpty
+            ? 'groupnav/packs/$_activePackCode/telemetry'
+            : 'groupnav/${packet.riderId}/telemetry';
         final builder = MqttClientPayloadBuilder();
         builder.addString(jsonEncode(packet.toJson()));
         _mqttClient!.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
@@ -251,7 +234,7 @@ class IotTelemetryService {
     }
   }
 
-  /// Broadcast a Quick Convoy Alert (Regroup, Refuel, Issue, Custom) to AWS IoT Core
+  /// Broadcast a Quick Convoy Alert to AWS IoT Core
   void publishAlert({
     required String packId,
     required String alertType,
@@ -261,12 +244,11 @@ class IotTelemetryService {
     final alertData = {
       'packId': packId,
       'alertType': alertType,
-      'callsign': callsign ?? 'Apex',
+      'callsign': callsign ?? _currentCallsign,
       'message': message ?? 'Alert triggered',
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     };
 
-    // Emit locally immediately for instantaneous UI reaction
     _alertController.add(alertData);
 
     if (_mqttClient != null && _isMqttConnected) {
@@ -275,44 +257,29 @@ class IotTelemetryService {
         final builder = MqttClientPayloadBuilder();
         builder.addString(jsonEncode(alertData));
         _mqttClient!.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
-        debugPrint('[IotTelemetryService] Published alert to $topic: $alertData');
       } catch (e) {
         debugPrint('[IotTelemetryService] Publish alert error: $e');
       }
     }
   }
 
-  /// Linear interpolation between waypoints along route
-  LatLng _interpolatePosition(double t) {
-    if (kSkylineSummitRoute.isEmpty) return const LatLng(37.7749, -122.4194);
-    final totalSegments = kSkylineSummitRoute.length - 1;
-    final scaled = t * totalSegments;
-    final index = scaled.floor().clamp(0, totalSegments - 1);
-    final fraction = scaled - index;
+  String get activePackCode => _activePackCode;
 
-    final p1 = kSkylineSummitRoute[index];
-    final p2 = kSkylineSummitRoute[index + 1];
-
-    final lat = p1.latitude + (p2.latitude - p1.latitude) * fraction;
-    final lng = p1.longitude + (p2.longitude - p1.longitude) * fraction;
-    return LatLng(lat, lng);
-  }
-
-  /// Package telemetry packet for AWS IoT Core publishing
   TelemetryPacket createPacket({
     required String riderId,
     required String callsign,
     required LatLng position,
     required double speedKmh,
     required double headingDeg,
+    String? packId,
   }) {
     return TelemetryPacket(
       riderId: riderId,
       callsign: callsign,
-      packId: '804',
+      packId: packId ?? (_activePackCode.isNotEmpty ? _activePackCode : 'solo'),
       latitude: position.latitude,
       longitude: position.longitude,
-      altitude: 312.0,
+      altitude: 0.0,
       speedKmh: speedKmh,
       headingDeg: headingDeg,
       timestamp: DateTime.now().millisecondsSinceEpoch,
@@ -320,10 +287,10 @@ class IotTelemetryService {
   }
 
   void dispose() {
-    _telemetryTicker?.cancel();
     _locationSub?.cancel();
     _mqttClient?.disconnect();
     _telemetryController.close();
     _alertController.close();
+    _connectionStatusController.close();
   }
 }

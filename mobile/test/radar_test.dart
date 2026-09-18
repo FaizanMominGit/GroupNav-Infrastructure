@@ -102,7 +102,7 @@ void main() {
   group('IotTelemetryService Packet Generation', () {
     test('createPacket returns valid schema', () {
       final service = IotTelemetryService(config: dummyConfig);
-      final packet = service.createPacket(
+      final soloPacket = service.createPacket(
         riderId: 'test-sub',
         callsign: 'Apex',
         position: const LatLng(37.7749, -122.4194),
@@ -110,12 +110,22 @@ void main() {
         headingDeg: 42.0,
       );
 
-      expect(packet.riderId, equals('test-sub'));
-      expect(packet.packId, equals('804'));
-      expect(packet.latitude, equals(37.7749));
-      expect(packet.longitude, equals(-122.4194));
-      expect(packet.speedKmh, equals(78.0));
-      expect(packet.headingDeg, equals(42.0));
+      expect(soloPacket.riderId, equals('test-sub'));
+      expect(soloPacket.packId, equals('solo'));
+      expect(soloPacket.latitude, equals(37.7749));
+      expect(soloPacket.longitude, equals(-122.4194));
+      expect(soloPacket.speedKmh, equals(78.0));
+      expect(soloPacket.headingDeg, equals(42.0));
+
+      service.updateActivePack('GN-9482');
+      final packPacket = service.createPacket(
+        riderId: 'test-sub',
+        callsign: 'Apex',
+        position: const LatLng(37.7749, -122.4194),
+        speedKmh: 80.0,
+        headingDeg: 45.0,
+      );
+      expect(packPacket.packId, equals('GN-9482'));
 
       service.dispose();
     });

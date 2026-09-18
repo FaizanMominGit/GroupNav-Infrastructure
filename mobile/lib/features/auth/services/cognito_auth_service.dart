@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/client_config.dart';
@@ -43,138 +44,226 @@ class CognitoAuthService {
 
   static const String _keyPilot = 'groupnav_pilot_profile';
   static const String _keyCredentials = 'groupnav_aws_credentials';
-  static const String _keyToken = 'groupnav_id_token';
+  static const String _keyIdToken = 'groupnav_id_token';
+  static const String _keyAccessToken = 'groupnav_access_token';
 
   CognitoAuthService({
     required this.config,
     AuthStorage? storage,
   }) : secureStorage = storage ?? const SecureAuthStorage();
 
-  /// Initiate authentication with Cognito User Pool
-  Future<Map<String, dynamic>> initiateAuth({
-    required String phoneOrEmail,
+  /// Register a new user in AWS Cognito User Pool
+  Future<Map<String, dynamic>> signUp({
+    required String email,
+    required String password,
     required String callsign,
   }) async {
-    final cognitoIdpEndpoint = Uri.parse('https://cognito-idp.${config.region}.amazonaws.com/');
+    final endpoint = Uri.parse('https://cognito-idp.${config.region}.amazonaws.com/');
 
-    try {
-      final response = await http.post(
-        cognitoIdpEndpoint,
-        headers: {
-          'Content-Type': 'application/x-amz-json-1.1',
-          'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
-        },
-        body: json.encode({
-          'AuthFlow': 'CUSTOM_AUTH',
-          'ClientId': config.cognito.userPoolClientId,
-          'AuthParameters': {
-            'USERNAME': phoneOrEmail,
-          },
-        }),
-      ).timeout(const Duration(seconds: 8));
+    final response = await http.post(
+      endpoint,
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.SignUp',
+      },
+      body: json.encode({
+        'ClientId': config.cognito.userPoolClientId,
+        'Username': email.trim(),
+        'Password': password,
+        'UserAttributes': [
+          {'Name': 'email', 'Value': email.trim()},
+          {'Name': 'name', 'Value': callsign.trim()},
+        ],
+      }),
+    ).timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        return {
-          'session': data['Session'] as String? ?? '0x82A1B9E3C1',
-          'challengeName': data['ChallengeName'] as String? ?? 'CUSTOM_CHALLENGE',
-        };
-      }
-    } catch (_) {
-      // In local dev/testing mode without active SMS delivery credentials,
-      // fallback to generated local session token
+    final data = json.decode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200) {
+      final errorType = (data['__type'] as String? ?? '').split('#').last;
+      final message = data['message'] as String? ?? 'Sign up failed';
+      throw Exception('AWS Cognito [$errorType]: $message');
     }
 
-    // Fallback/Sandbox session identifier for local/demo testing
     return {
-      'session': '0x82A1B9E3C1',
-      'challengeName': 'SMS_OTP',
+      'userConfirmed': data['UserConfirmed'] as bool? ?? false,
+      'userSub': data['UserSub'] as String? ?? '',
     };
   }
 
-  /// Verify OTP code and exchange for Cognito Identity Pool credentials
-  Future<Map<String, dynamic>> verifyOtp({
-    required String phoneOrEmail,
-    required String otpCode,
-    required String session,
-    required String callsign,
-    required String vehicleClass,
-    required String beaconColor,
+  /// Confirm user email registration with 6-digit confirmation code
+  Future<bool> confirmSignUp({
+    required String email,
+    required String confirmationCode,
   }) async {
-    // Attempt real Cognito IDP challenge response
-    String? idToken;
-    try {
-      final cognitoIdpEndpoint = Uri.parse('https://cognito-idp.${config.region}.amazonaws.com/');
-      final response = await http.post(
-        cognitoIdpEndpoint,
-        headers: {
-          'Content-Type': 'application/x-amz-json-1.1',
-          'X-Amz-Target': 'AWSCognitoIdentityProviderService.RespondToAuthChallenge',
-        },
-        body: json.encode({
-          'ClientId': config.cognito.userPoolClientId,
-          'ChallengeName': 'CUSTOM_CHALLENGE',
-          'Session': session,
-          'ChallengeResponses': {
-            'USERNAME': phoneOrEmail,
-            'ANSWER': otpCode,
-          },
-        }),
-      ).timeout(const Duration(seconds: 8));
+    final endpoint = Uri.parse('https://cognito-idp.${config.region}.amazonaws.com/');
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        final authResult = data['AuthenticationResult'] as Map<String, dynamic>?;
-        idToken = authResult?['IdToken'] as String?;
-      }
-    } catch (_) {
-      // Network or sandbox mode fallback
+    final response = await http.post(
+      endpoint,
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.ConfirmSignUp',
+      },
+      body: json.encode({
+        'ClientId': config.cognito.userPoolClientId,
+        'Username': email.trim(),
+        'ConfirmationCode': confirmationCode.trim(),
+      }),
+    ).timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final errorType = (data['__type'] as String? ?? '').split('#').last;
+      final message = data['message'] as String? ?? 'Confirmation failed';
+      throw Exception('AWS Cognito [$errorType]: $message');
     }
 
-    idToken ??= 'mock-id-token-${DateTime.now().millisecondsSinceEpoch}';
+    return true;
+  }
 
-    // Retrieve Identity ID from Identity Pool
-    String identityId = config.cognito.identityPoolId;
-    Map<String, String> awsCredentials = {
-      'AccessKeyId': 'ASIA_DEV_${DateTime.now().millisecondsSinceEpoch}',
-      'SecretKey': 'MOCK_SECRET_KEY',
-      'SessionToken': 'MOCK_SESSION_TOKEN',
+  /// Resend confirmation code to user's email
+  Future<void> resendConfirmationCode({required String email}) async {
+    final endpoint = Uri.parse('https://cognito-idp.${config.region}.amazonaws.com/');
+
+    final response = await http.post(
+      endpoint,
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.ResendConfirmationCode',
+      },
+      body: json.encode({
+        'ClientId': config.cognito.userPoolClientId,
+        'Username': email.trim(),
+      }),
+    ).timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final errorType = (data['__type'] as String? ?? '').split('#').last;
+      final message = data['message'] as String? ?? 'Resend failed';
+      throw Exception('AWS Cognito [$errorType]: $message');
+    }
+  }
+
+  /// Authenticate user via USER_PASSWORD_AUTH and exchange ID token for temporary AWS IAM credentials
+  Future<Map<String, dynamic>> signIn({
+    required String email,
+    required String password,
+    String? callsign,
+    String vehicleClass = 'SPORT',
+    String beaconColor = '#0050CB',
+  }) async {
+    final idpEndpoint = Uri.parse('https://cognito-idp.${config.region}.amazonaws.com/');
+
+    final authResponse = await http.post(
+      idpEndpoint,
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
+      },
+      body: json.encode({
+        'AuthFlow': 'USER_PASSWORD_AUTH',
+        'ClientId': config.cognito.userPoolClientId,
+        'AuthParameters': {
+          'USERNAME': email.trim(),
+          'PASSWORD': password,
+        },
+      }),
+    ).timeout(const Duration(seconds: 15));
+
+    final authData = json.decode(authResponse.body) as Map<String, dynamic>;
+    if (authResponse.statusCode != 200) {
+      final errorType = (authData['__type'] as String? ?? '').split('#').last;
+      final message = authData['message'] as String? ?? 'Authentication failed';
+      throw Exception('AWS Cognito [$errorType]: $message');
+    }
+
+    final authResult = authData['AuthenticationResult'] as Map<String, dynamic>?;
+    if (authResult == null) {
+      throw Exception('AWS Cognito: Missing AuthenticationResult in response');
+    }
+
+    final idToken = authResult['IdToken'] as String;
+    final accessToken = authResult['AccessToken'] as String;
+
+    // Decode ID token to extract user attributes
+    final tokenClaims = _decodeJwtPayload(idToken);
+    final userSub = tokenClaims['sub'] as String? ?? '';
+    final resolvedCallsign = callsign ?? tokenClaims['name'] as String? ?? email.split('@').first;
+
+    // Exchange Cognito ID Token for real AWS temporary IAM credentials from Cognito Identity Pool
+    final identityEndpoint = Uri.parse('https://cognito-identity.${config.region}.amazonaws.com/');
+    final providerKey = 'cognito-idp.${config.region}.amazonaws.com/${config.cognito.userPoolId}';
+
+    // 1. Get Identity ID
+    final getIdResponse = await http.post(
+      identityEndpoint,
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityService.GetId',
+      },
+      body: json.encode({
+        'IdentityPoolId': config.cognito.identityPoolId,
+        'Logins': {
+          providerKey: idToken,
+        },
+      }),
+    ).timeout(const Duration(seconds: 15));
+
+    final getIdData = json.decode(getIdResponse.body) as Map<String, dynamic>;
+    if (getIdResponse.statusCode != 200) {
+      final errorType = (getIdData['__type'] as String? ?? '').split('#').last;
+      final message = getIdData['message'] as String? ?? 'Failed to retrieve Cognito Identity ID';
+      throw Exception('AWS Cognito Identity [$errorType]: $message');
+    }
+
+    final identityId = getIdData['IdentityId'] as String;
+
+    // 2. Get Credentials For Identity
+    final getCredsResponse = await http.post(
+      identityEndpoint,
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityService.GetCredentialsForIdentity',
+      },
+      body: json.encode({
+        'IdentityId': identityId,
+        'Logins': {
+          providerKey: idToken,
+        },
+      }),
+    ).timeout(const Duration(seconds: 15));
+
+    final getCredsData = json.decode(getCredsResponse.body) as Map<String, dynamic>;
+    if (getCredsResponse.statusCode != 200) {
+      final errorType = (getCredsData['__type'] as String? ?? '').split('#').last;
+      final message = getCredsData['message'] as String? ?? 'Failed to retrieve AWS credentials';
+      throw Exception('AWS Cognito Identity [$errorType]: $message');
+    }
+
+    final creds = getCredsData['Credentials'] as Map<String, dynamic>;
+    final awsCredentials = {
+      'AccessKeyId': creds['AccessKeyId'] as String,
+      'SecretKey': creds['SecretKey'] as String,
+      'SessionToken': creds['SessionToken'] as String,
+      if (creds['Expiration'] != null) 'Expiration': creds['Expiration'].toString(),
     };
 
-    try {
-      final identityEndpoint = Uri.parse('https://cognito-identity.${config.region}.amazonaws.com/');
-      final getIdResponse = await http.post(
-        identityEndpoint,
-        headers: {
-          'Content-Type': 'application/x-amz-json-1.1',
-          'X-Amz-Target': 'AWSCognitoIdentityService.GetId',
-        },
-        body: json.encode({
-          'IdentityPoolId': config.cognito.identityPoolId,
-        }),
-      ).timeout(const Duration(seconds: 5));
-
-      if (getIdResponse.statusCode == 200) {
-        final idData = json.decode(getIdResponse.body) as Map<String, dynamic>;
-        identityId = idData['IdentityId'] as String? ?? identityId;
-      }
-    } catch (_) {
-      // Identity fallback
-    }
-
     final pilot = PilotProfile(
-      phoneOrEmail: phoneOrEmail,
-      callsign: callsign,
+      phoneOrEmail: email.trim(),
+      callsign: resolvedCallsign,
       vehicleClass: vehicleClass,
       beaconColor: beaconColor,
       cognitoIdentityId: identityId,
-      cognitoSub: identityId.split(':').last,
+      cognitoSub: userSub,
     );
 
-    // Persist securely to device keystore
+    // Save to secure device storage
     await secureStorage.write(key: _keyPilot, value: json.encode(pilot.toJson()));
     await secureStorage.write(key: _keyCredentials, value: json.encode(awsCredentials));
-    await secureStorage.write(key: _keyToken, value: idToken);
+    await secureStorage.write(key: _keyIdToken, value: idToken);
+    await secureStorage.write(key: _keyAccessToken, value: accessToken);
+
+    debugPrint('[CognitoAuthService] Real AWS credentials acquired successfully for $email');
 
     return {
       'pilot': pilot,
@@ -182,7 +271,7 @@ class CognitoAuthService {
     };
   }
 
-  /// Restore saved session from secure hardware keystore
+  /// Restore saved session from secure device keystore
   Future<PilotProfile?> restoreSession() async {
     final rawPilot = await secureStorage.read(key: _keyPilot);
     if (rawPilot == null) return null;
@@ -195,7 +284,7 @@ class CognitoAuthService {
     }
   }
 
-  /// Retrieve active AWS credentials
+  /// Retrieve active AWS credentials from storage
   Future<Map<String, String>?> getCachedCredentials() async {
     final rawCreds = await secureStorage.read(key: _keyCredentials);
     if (rawCreds == null) return null;
@@ -208,10 +297,23 @@ class CognitoAuthService {
     }
   }
 
-  /// Sign out and purge credentials from hardware secure store
+  /// Sign out and clear stored credentials
   Future<void> signOut() async {
     await secureStorage.delete(key: _keyPilot);
     await secureStorage.delete(key: _keyCredentials);
-    await secureStorage.delete(key: _keyToken);
+    await secureStorage.delete(key: _keyIdToken);
+    await secureStorage.delete(key: _keyAccessToken);
+  }
+
+  Map<String, dynamic> _decodeJwtPayload(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return {};
+      final normalized = base64Url.normalize(parts[1]);
+      final resp = utf8.decode(base64Url.decode(normalized));
+      return json.decode(resp) as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    }
   }
 }

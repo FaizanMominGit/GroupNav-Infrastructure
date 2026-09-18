@@ -62,6 +62,76 @@ class AwsSigV4Signer {
     return 'wss://$endpoint/mqtt?$canonicalQueryString&X-Amz-Signature=$signature';
   }
 
+  /// Sign an arbitrary HTTP request with AWS SigV4
+  Map<String, String> signHttpRequest({
+    required String method,
+    required String path,
+    required String service,
+    required String host,
+    required String target,
+    required String body,
+    required String accessKeyId,
+    required String secretKey,
+    String? sessionToken,
+    DateTime? requestTime,
+  }) {
+    final now = requestTime?.toUtc() ?? DateTime.now().toUtc();
+    final dateStamp = _formatDate(now);
+    final amzDate = _formatDateTime(now);
+    final credentialScope = '$dateStamp/$region/$service/aws4_request';
+
+    final payloadHash = sha256.convert(utf8.encode(body)).toString();
+
+    final headersToSign = <String, String>{
+      'content-type': 'application/x-amz-json-1.0',
+      'host': host,
+      'x-amz-date': amzDate,
+      'x-amz-target': target,
+      if (sessionToken != null && sessionToken.isNotEmpty)
+        'x-amz-security-token': sessionToken,
+    };
+
+    final sortedHeaderKeys = headersToSign.keys.toList()..sort();
+    final canonicalHeaders = sortedHeaderKeys
+        .map((k) => '$k:${headersToSign[k]!.trim()}\n')
+        .join('');
+    final signedHeaders = sortedHeaderKeys.join(';');
+
+    final canonicalRequest = [
+      method.toUpperCase(),
+      path,
+      '', // Canonical query string (empty for POST to DynamoDB)
+      canonicalHeaders,
+      signedHeaders,
+      payloadHash,
+    ].join('\n');
+
+    final stringToSign = [
+      'AWS4-HMAC-SHA256',
+      amzDate,
+      credentialScope,
+      sha256.convert(utf8.encode(canonicalRequest)).toString(),
+    ].join('\n');
+
+    final signingKey = _getSignatureKey(secretKey, dateStamp, region, service);
+    final signature = Hmac(sha256, signingKey).convert(utf8.encode(stringToSign)).toString();
+
+    final authHeader = 'AWS4-HMAC-SHA256 '
+        'Credential=$accessKeyId/$credentialScope, '
+        'SignedHeaders=$signedHeaders, '
+        'Signature=$signature';
+
+    return {
+      'Content-Type': 'application/x-amz-json-1.0',
+      'Host': host,
+      'X-Amz-Date': amzDate,
+      'X-Amz-Target': target,
+      if (sessionToken != null && sessionToken.isNotEmpty)
+        'X-Amz-Security-Token': sessionToken,
+      'Authorization': authHeader,
+    };
+  }
+
   List<int> _getSignatureKey(String key, String dateStamp, String regionName, String serviceName) {
     final kDate = Hmac(sha256, utf8.encode('AWS4$key')).convert(utf8.encode(dateStamp)).bytes;
     final kRegion = Hmac(sha256, kDate).convert(utf8.encode(regionName)).bytes;

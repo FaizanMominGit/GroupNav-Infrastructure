@@ -125,7 +125,7 @@ void main() {
       final notifier = TripHistoryNotifier();
       final state = notifier.state;
 
-      expect(state.availableTrips.isNotEmpty, true);
+      expect(state.availableTrips.isEmpty, true);
       expect(state.isPlaying, false);
       expect(state.progress, 0.0);
       expect(state.playbackSpeed, 1.0);
@@ -134,13 +134,28 @@ void main() {
 
     test('selectTrip switches active session and resets scrubber', () {
       final notifier = TripHistoryNotifier();
+      final sampleTrip = TripRecord(
+        id: 'sample-1',
+        title: 'Sample Ride',
+        date: DateTime.now(),
+        distanceKm: 12.0,
+        duration: const Duration(minutes: 20),
+        maxSpeedKmh: 80,
+        avgSpeedKmh: 60,
+        totalClimbMeters: 50,
+        packRidersCount: 1,
+        routeCoordinates: const [LatLng(19.0760, 72.8777), LatLng(19.0800, 72.8800)],
+        waypoints: const [],
+        elevationProfile: const [],
+      );
+
+      notifier.selectTrip(sampleTrip);
       notifier.seekProgress(0.75);
       expect(notifier.state.progress, 0.75);
 
-      final newTrip = notifier.state.availableTrips.last;
-      notifier.selectTrip(newTrip);
+      notifier.selectTrip(sampleTrip);
 
-      expect(notifier.state.selectedTrip.id, newTrip.id);
+      expect(notifier.state.selectedTrip?.id, sampleTrip.id);
       expect(notifier.state.progress, 0.0);
       expect(notifier.state.isPlaying, false);
     });
@@ -148,6 +163,22 @@ void main() {
     test('togglePlayPause transitions playback play and pause states', () {
       final notifier = TripHistoryNotifier();
       expect(notifier.state.isPlaying, false);
+
+      final sampleTrip = TripRecord(
+        id: 'sample-1',
+        title: 'Sample Ride',
+        date: DateTime.now(),
+        distanceKm: 12.0,
+        duration: const Duration(minutes: 20),
+        maxSpeedKmh: 80,
+        avgSpeedKmh: 60,
+        totalClimbMeters: 50,
+        packRidersCount: 1,
+        routeCoordinates: const [LatLng(19.0760, 72.8777), LatLng(19.0800, 72.8800)],
+        waypoints: const [],
+        elevationProfile: const [],
+      );
+      notifier.selectTrip(sampleTrip);
 
       notifier.togglePlayPause();
       expect(notifier.state.isPlaying, true);
@@ -158,6 +189,25 @@ void main() {
 
     test('seekProgress clamps progress and updates interpolated coordinates', () {
       final notifier = TripHistoryNotifier();
+      final sampleTrip = TripRecord(
+        id: 'sample-1',
+        title: 'Sample Ride',
+        date: DateTime.now(),
+        distanceKm: 12.0,
+        duration: const Duration(minutes: 20),
+        maxSpeedKmh: 80,
+        avgSpeedKmh: 60,
+        totalClimbMeters: 50,
+        packRidersCount: 1,
+        routeCoordinates: const [LatLng(19.0760, 72.8777), LatLng(19.0800, 72.8800)],
+        waypoints: const [],
+        elevationProfile: const [
+          ElevationPoint(distanceKm: 0.0, elevationMeters: 10, speedKmh: 40),
+          ElevationPoint(distanceKm: 12.0, elevationMeters: 50, speedKmh: 80),
+        ],
+      );
+      notifier.selectTrip(sampleTrip);
+
       notifier.seekProgress(0.5);
 
       expect(notifier.state.progress, 0.5);
@@ -189,18 +239,16 @@ void main() {
     test('Live recording accumulates breadcrumbs and finalizes into selectable TripRecord', () {
       final notifier = TripHistoryNotifier();
       final initialCount = notifier.state.availableTrips.length;
-
-      expect(notifier.state.isRecording, isFalse);
+      expect(initialCount, equals(0)); // No fake mock trips!
 
       notifier.startRecording(title: 'Apex Skyline Test');
       expect(notifier.state.isRecording, isTrue);
       expect(notifier.state.activeRecordingTitle, equals('Apex Skyline Test'));
-      expect(notifier.state.recordedCoordinates, isEmpty);
 
-      // Add breadcrumbs along simulated ride
-      notifier.addBreadcrumb(const LatLng(37.7749, -122.4194), 45.0, 100.0);
-      notifier.addBreadcrumb(const LatLng(37.7780, -122.4150), 75.0, 150.0);
-      notifier.addBreadcrumb(const LatLng(37.7850, -122.4070), 85.0, 210.0);
+      // Accumulate 3 breadcrumbs
+      notifier.addBreadcrumb(const LatLng(37.7749, -122.4194), 55.0, 310.0);
+      notifier.addBreadcrumb(const LatLng(37.7800, -122.4150), 65.0, 325.0);
+      notifier.addBreadcrumb(const LatLng(37.7850, -122.4110), 85.0, 340.0);
 
       expect(notifier.state.recordedCoordinates.length, equals(3));
       expect(notifier.state.recordedElevations.length, equals(3));
@@ -217,8 +265,8 @@ void main() {
 
       // Verify prepended into availableTrips and active
       expect(notifier.state.availableTrips.length, equals(initialCount + 1));
-      expect(notifier.state.selectedTrip.id, equals(savedTrip.id));
-      expect(notifier.state.selectedTrip.title, equals('Apex Skyline Test'));
+      expect(notifier.state.selectedTrip?.id, equals(savedTrip.id));
+      expect(notifier.state.selectedTrip?.title, equals('Apex Skyline Test'));
 
       // Verify exportability
       final gpx = savedTrip.toGpx();

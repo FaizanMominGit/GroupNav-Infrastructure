@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/services/location_service.dart';
 import '../../auth/models/auth_state.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../groups/providers/pack_provider.dart';
 import '../../settings/models/rider_settings.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../models/convoy_peer.dart';
@@ -19,18 +20,20 @@ class RadarState {
   final bool isBroadcasting;
   final double geofenceRadiusMeters;
   final List<LatLng> routeWaypoints;
+  final bool isAwsConnected;
 
   const RadarState({
     this.peers = const [],
-    this.centerPosition = const LatLng(37.7749, -122.4194),
-    this.currentSpeed = 78.0,
-    this.currentHeading = 42.0,
-    this.currentElevation = 312.0,
-    this.packCohesion = 98,
-    this.cohesionStatus = 'TIGHT',
+    this.centerPosition = const LatLng(19.0760, 72.8777), // Default geographic reference (Mumbai / ap-south-1)
+    this.currentSpeed = 0.0,
+    this.currentHeading = 0.0,
+    this.currentElevation = 0.0,
+    this.packCohesion = 100,
+    this.cohesionStatus = 'SOLO',
     this.isBroadcasting = true,
     this.geofenceRadiusMeters = 800.0,
     this.routeWaypoints = const [],
+    this.isAwsConnected = false,
   });
 
   String get headingDisplay {
@@ -66,6 +69,7 @@ class RadarState {
     bool? isBroadcasting,
     double? geofenceRadiusMeters,
     List<LatLng>? routeWaypoints,
+    bool? isAwsConnected,
   }) {
     return RadarState(
       peers: peers ?? this.peers,
@@ -78,6 +82,7 @@ class RadarState {
       isBroadcasting: isBroadcasting ?? this.isBroadcasting,
       geofenceRadiusMeters: geofenceRadiusMeters ?? this.geofenceRadiusMeters,
       routeWaypoints: routeWaypoints ?? this.routeWaypoints,
+      isAwsConnected: isAwsConnected ?? this.isAwsConnected,
     );
   }
 }
@@ -102,9 +107,16 @@ final iotTelemetryServiceProvider = Provider<IotTelemetryService>((ref) {
   final locationService = ref.watch(locationServiceProvider);
   final service = IotTelemetryService(config: config, locationService: locationService);
 
-  // When auth credentials change, connect MQTT if available
+  // When auth credentials change, connect MQTT with authentic SigV4 credentials
   ref.listen<AuthState>(authNotifierProvider, (previous, next) {
     final creds = next.awsCredentials;
+    if (next.pilot != null) {
+      service.updateRiderIdentity(
+        riderId: next.pilot!.cognitoIdentityId ?? 'pilot',
+        callsign: next.pilot!.callsign,
+      );
+    }
+
     if (creds != null &&
         creds['AccessKeyId'] != null &&
         creds['SecretKey'] != null &&
@@ -123,34 +135,58 @@ final iotTelemetryServiceProvider = Provider<IotTelemetryService>((ref) {
 
 final radarNotifierProvider = StateNotifierProvider<RadarNotifier, RadarState>((ref) {
   final telemetryService = ref.watch(iotTelemetryServiceProvider);
-  return RadarNotifier(telemetryService);
+  return RadarNotifier(telemetryService, ref);
 });
 
 class RadarNotifier extends StateNotifier<RadarState> {
   final IotTelemetryService _telemetryService;
+  final Ref? _ref;
 
-  RadarNotifier(this._telemetryService)
-      : super(RadarState(routeWaypoints: kSkylineSummitRoute)) {
+  RadarNotifier(this._telemetryService, [this._ref])
+      : super(const RadarState()) {
     _listenToTelemetry();
+    _listenToConnection();
+    _syncPackSubscription();
+  }
+
+  void _syncPackSubscription() {
+    _ref?.listen(packNotifierProvider, (previous, next) {
+      if (next.isInPack && next.packCode.isNotEmpty) {
+        _telemetryService.updateActivePack(next.packCode);
+      } else {
+        _telemetryService.updateActivePack('');
+      }
+    });
+  }
+
+  void _listenToConnection() {
+    _telemetryService.connectionStatusStream.listen((connected) {
+      if (!mounted) return;
+      state = state.copyWith(isAwsConnected: connected);
+    });
   }
 
   void _listenToTelemetry() {
     _telemetryService.convoyStream.listen((peers) {
       if (!mounted) return;
+      if (peers.isEmpty) return;
 
       final leader = peers.firstWhere((p) => p.isLeader, orElse: () => peers.first);
 
-      // Compute dynamic cohesion score based on trailing distances
-      int cohesion = 98;
-      String status = 'TIGHT';
-      for (final p in peers) {
-        if (p.relativeOffsetMeters.abs() > 300) {
-          cohesion = 74;
-          status = 'SPREAD';
-          break;
-        } else if (p.relativeOffsetMeters.abs() > 150) {
-          cohesion = 88;
-          status = 'EXTENDED';
+      // Compute dynamic cohesion score based on real peer distance
+      int cohesion = 100;
+      String status = peers.length > 1 ? 'TIGHT' : 'SOLO';
+
+      if (peers.length > 1) {
+        for (final p in peers) {
+          if (p.relativeOffsetMeters.abs() > 300) {
+            cohesion = 74;
+            status = 'SPREAD';
+            break;
+          } else if (p.relativeOffsetMeters.abs() > 150) {
+            cohesion = 88;
+            status = 'EXTENDED';
+          }
         }
       }
 
@@ -162,6 +198,7 @@ class RadarNotifier extends StateNotifier<RadarState> {
         currentElevation: leader.altitude,
         packCohesion: cohesion,
         cohesionStatus: status,
+        isAwsConnected: _telemetryService.isMqttConnected,
       );
     });
   }

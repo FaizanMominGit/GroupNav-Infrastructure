@@ -184,39 +184,74 @@ class TripHistoryScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
 
-            // 1. Interactive Replay Map
-            TripReplayMap(
-              trip: currentTrip,
-              activePosition: playbackState.activePosition,
-              progress: playbackState.progress,
-            ),
-            const SizedBox(height: 12),
+            if (currentTrip == null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.borderSubtle),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.route, size: 28, color: AppColors.primary),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'No Recorded Trips Yet',
+                      style: AppTypography.headlineMd.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Tap "Record" above to capture live GPS telemetry, speeds, and elevation profile. Saved rides will appear here for animated playback and GPX/GeoJSON export.',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              // 1. Interactive Replay Map
+              TripReplayMap(
+                trip: currentTrip,
+                activePosition: playbackState.activePosition,
+                progress: playbackState.progress,
+              ),
+              const SizedBox(height: 12),
 
-            // 2. Tactile Replay Control Bar (Scrubber + Play/Pause + Speed)
-            ReplayControlBar(
-              trip: currentTrip,
-              playbackState: playbackState,
-              onTogglePlayPause: historyNotifier.togglePlayPause,
-              onSeek: historyNotifier.seekProgress,
-              onCycleSpeed: historyNotifier.cyclePlaybackSpeed,
-            ),
-            const SizedBox(height: 16),
+              // 2. Tactile Replay Control Bar (Scrubber + Play/Pause + Speed)
+              ReplayControlBar(
+                trip: currentTrip,
+                playbackState: playbackState,
+                onTogglePlayPause: historyNotifier.togglePlayPause,
+                onSeek: historyNotifier.seekProgress,
+                onCycleSpeed: historyNotifier.cyclePlaybackSpeed,
+              ),
+              const SizedBox(height: 16),
 
-            // 3. Spatial Elevation & Pace Chart (LiDAR mesh + Triad)
-            ElevationPaceChartCard(
-              trip: currentTrip,
-              currentPoint: playbackState.currentElevationPoint,
-              progress: playbackState.progress,
-              onScrub: historyNotifier.seekProgress,
-            ),
-            const SizedBox(height: 16),
+              // 3. Spatial Elevation & Pace Chart (LiDAR mesh + Triad)
+              ElevationPaceChartCard(
+                trip: currentTrip,
+                currentPoint: playbackState.currentElevationPoint,
+                progress: playbackState.progress,
+                onScrub: historyNotifier.seekProgress,
+              ),
+              const SizedBox(height: 16),
 
-            // 4. Recorded Convoys List & Spatial Export
-            RecordedConvoysCard(
-              trips: playbackState.availableTrips,
-              selectedTrip: currentTrip,
-              onSelectTrip: historyNotifier.selectTrip,
-            ),
+              // 4. Recorded Convoys List & Spatial Export
+              RecordedConvoysCard(
+                trips: playbackState.availableTrips,
+                selectedTrip: currentTrip,
+                onSelectTrip: historyNotifier.selectTrip,
+              ),
+            ],
             const SizedBox(height: 24),
           ],
         ),

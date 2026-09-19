@@ -6,11 +6,17 @@ import '../models/pack_member.dart';
 class PackRosterCard extends StatelessWidget {
   final PackMember member;
   final VoidCallback? onPing;
+  final ValueChanged<PackRole>? onRoleChanged;
+  final VoidCallback? onKick;
+  final bool canModerate;
 
   const PackRosterCard({
     super.key,
     required this.member,
     this.onPing,
+    this.onRoleChanged,
+    this.onKick,
+    this.canModerate = false,
   });
 
   @override
@@ -66,7 +72,7 @@ class PackRosterCard extends StatelessWidget {
           ),
           const SizedBox(width: 12),
 
-          // Name and Speed (Left)
+          // Name, Role Badge, and Speed (Left)
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,11 +85,39 @@ class PackRosterCard extends StatelessWidget {
                       child: Text(
                         member.callsign,
                         style: AppTypography.headlineMd.copyWith(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: isOffline ? AppColors.textSecondary : AppColors.textPrimary,
                         ),
                         overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    // Tactical Role Badge Pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: member.roleBadgeColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: member.roleBadgeColor.withValues(alpha: 0.4),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(member.roleIcon, size: 10, color: member.roleBadgeColor),
+                          const SizedBox(width: 3),
+                          Text(
+                            member.roleLabel,
+                            style: AppTypography.labelSm.copyWith(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: member.roleBadgeColor,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     if (isLead) ...[
@@ -103,7 +137,7 @@ class PackRosterCard extends StatelessWidget {
                 Text(
                   isOffline
                       ? (member.lastSeenDescription ?? 'Offline · 3m ago')
-                      : '${member.speedKmh.round()} km/h',
+                      : '${member.speedKmh.round()} km/h · ${member.offsetDescription}',
                   style: AppTypography.bodySm.copyWith(
                     fontSize: 12,
                     color: isWarning
@@ -165,6 +199,59 @@ class PackRosterCard extends StatelessWidget {
                 ),
               ),
             ),
+
+          // Road Captain Moderation Menu
+          if (canModerate) ...[
+            const SizedBox(width: 4),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textSecondary),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onSelected: (action) {
+                if (action == 'assign_sweeper') {
+                  onRoleChanged?.call(PackRole.tailGunner);
+                } else if (action == 'assign_member') {
+                  onRoleChanged?.call(PackRole.packMember);
+                } else if (action == 'kick') {
+                  onKick?.call();
+                }
+              },
+              itemBuilder: (ctx) => [
+                if (member.role != PackRole.tailGunner)
+                  const PopupMenuItem(
+                    value: 'assign_sweeper',
+                    child: Row(
+                      children: [
+                        Icon(Icons.shield_outlined, size: 16, color: AppColors.telemetryEmerald),
+                        SizedBox(width: 8),
+                        Text('Assign as Tail Gunner'),
+                      ],
+                    ),
+                  ),
+                if (member.role == PackRole.tailGunner)
+                  const PopupMenuItem(
+                    value: 'assign_member',
+                    child: Row(
+                      children: [
+                        Icon(Icons.two_wheeler, size: 16, color: AppColors.primary),
+                        SizedBox(width: 8),
+                        Text('Set Regular Member'),
+                      ],
+                    ),
+                  ),
+                const PopupMenuItem(
+                  value: 'kick',
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_remove, size: 16, color: AppColors.alertCritical),
+                      SizedBox(width: 8),
+                      Text('Kick from Convoy', style: TextStyle(color: AppColors.alertCritical)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

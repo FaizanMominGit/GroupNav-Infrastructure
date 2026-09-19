@@ -10,12 +10,18 @@ class ActiveCodeCard extends StatelessWidget {
   final PackFormation formation;
   final VoidCallback onExpandMap;
   final String qrPayload;
+  final bool isCaptain;
+  final ValueChanged<bool>? onToggleLock;
+  final VoidCallback? onDisband;
 
   const ActiveCodeCard({
     super.key,
     required this.formation,
     required this.onExpandMap,
     required this.qrPayload,
+    this.isCaptain = false,
+    this.onToggleLock,
+    this.onDisband,
   });
 
   @override
@@ -40,89 +46,165 @@ class ActiveCodeCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Code display and copy action
+              // Code display and copy/share action
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'PACK JOIN CODE',
-                      style: AppTypography.labelSm.copyWith(
-                        fontSize: 10,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
                     Row(
                       children: [
-                        // Monospace Code Container
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryFixed.withValues(alpha: 0.40),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.20)),
-                          ),
-                          child: Text(
-                            formation.packCode,
-                            style: AppTypography.headlineLg.copyWith(
-                              fontFamily: 'monospace',
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 18,
-                              letterSpacing: 1.5,
-                            ),
+                        Text(
+                          'PACK JOIN CODE',
+                          style: AppTypography.labelSm.copyWith(
+                            fontSize: 10,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.8,
                           ),
                         ),
-                        const SizedBox(width: 8),
-
-                        // Copy Code Button
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              Clipboard.setData(ClipboardData(text: formation.packCode));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Pack code "${formation.packCode}" copied!'),
-                                  backgroundColor: AppColors.primary,
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              height: 40,
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceContainerLow,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.content_copy, size: 16, color: AppColors.primary),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Copy',
-                                    style: AppTypography.labelSm.copyWith(
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12,
-                                    ),
+                        if (formation.isLocked) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.alertWarning.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: AppColors.alertWarning.withValues(alpha: 0.5)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.lock, size: 10, color: AppColors.alertWarning),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'LOCKED',
+                                  style: AppTypography.labelSm.copyWith(
+                                    color: AppColors.alertWarning,
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w800,
                                   ),
-                                ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          // Monospace Code Container
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryFixed.withValues(alpha: 0.40),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.primary.withValues(alpha: 0.20)),
+                            ),
+                            child: Text(
+                              formation.packCode,
+                              style: AppTypography.headlineLg.copyWith(
+                                fontFamily: 'monospace',
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                letterSpacing: 1.2,
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+
+                          // Copy Code Button
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(text: formation.packCode));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Pack code "${formation.packCode}" copied!'),
+                                    backgroundColor: AppColors.primary,
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                height: 38,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.content_copy, size: 14, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Copy',
+                                      style: AppTypography.labelSm.copyWith(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+
+                          // Universal Share Link Button
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(text: formation.shareLink));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Convoy invite link copied:\n${formation.shareLink}'),
+                                    backgroundColor: AppColors.primary,
+                                    duration: const Duration(seconds: 3),
+                                  ),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                height: 38,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.share, size: 14, color: AppColors.secondary),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Share',
+                                      style: AppTypography.labelSm.copyWith(
+                                        color: AppColors.secondary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
 
               // Pair QR Action Button
               Material(
@@ -136,8 +218,8 @@ class ActiveCodeCard extends StatelessWidget {
                   ),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    width: 58,
-                    height: 58,
+                    width: 54,
+                    height: 54,
                     decoration: BoxDecoration(
                       color: AppColors.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(12),
@@ -153,10 +235,10 @@ class ActiveCodeCard extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.qr_code_2, size: 26, color: AppColors.textPrimary),
+                        const Icon(Icons.qr_code_2, size: 24, color: AppColors.textPrimary),
                         const SizedBox(height: 2),
                         Text(
-                          'Pair QR',
+                          'QR Code',
                           style: AppTypography.labelSm.copyWith(
                             fontSize: 9,
                             color: AppColors.textSecondary,
@@ -170,6 +252,65 @@ class ActiveCodeCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+
+          // Road Captain Moderation Control Pill
+          if (isCaptain) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: formation.isLocked
+                    ? AppColors.alertWarning.withValues(alpha: 0.08)
+                    : AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: formation.isLocked
+                      ? AppColors.alertWarning.withValues(alpha: 0.3)
+                      : AppColors.borderSubtle,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        formation.isLocked ? Icons.lock : Icons.lock_open,
+                        size: 16,
+                        color: formation.isLocked ? AppColors.alertWarning : AppColors.telemetryEmerald,
+                      ),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            formation.isLocked ? 'Room Locked (Entrants Blocked)' : 'Room Open (Riders Can Join)',
+                            style: AppTypography.labelSm.copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                              color: formation.isLocked ? AppColors.alertWarning : AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            formation.isLocked ? 'Switch to unlock' : 'Switch to prevent new riders',
+                            style: AppTypography.bodySm.copyWith(
+                              color: AppColors.textSecondary,
+                              fontSize: 9.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  Switch.adaptive(
+                    value: formation.isLocked,
+                    onChanged: onToggleLock,
+                    activeColor: AppColors.alertWarning,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
 
           // Formation Discipline Pill
           Container(

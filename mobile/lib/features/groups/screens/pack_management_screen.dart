@@ -3,8 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../models/pack_formation.dart';
+import '../models/pack_member.dart';
 import '../providers/pack_provider.dart';
 import '../widgets/active_code_card.dart';
+import '../widgets/camera_qr_scanner_modal.dart';
 import '../widgets/create_convoy_sheet.dart';
 import '../widgets/geofence_slider_widget.dart';
 import '../widgets/pack_roster_card.dart';
@@ -21,6 +25,12 @@ class PackManagementScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final formation = ref.watch(packNotifierProvider);
     final packNotifier = ref.read(packNotifierProvider.notifier);
+    final auth = ref.watch(authNotifierProvider);
+    final currentRiderId = auth.pilot?.cognitoIdentityId ?? 'solo-rider';
+    final isCaptain = formation.isCaptain(currentRiderId) ||
+        (formation.members.isNotEmpty &&
+            formation.members.first.id == currentRiderId &&
+            formation.members.first.isRoadCaptain);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -160,7 +170,7 @@ class PackManagementScreen extends ConsumerWidget {
         ),
       ),
       body: formation.isInPack
-          ? _buildInPackView(context, formation, packNotifier)
+          ? _buildInPackView(context, formation, packNotifier, isCaptain, currentRiderId)
           : _buildSoloView(context, formation, packNotifier),
     );
   }
@@ -168,7 +178,13 @@ class PackManagementScreen extends ConsumerWidget {
   // ---------------------------------------------------------------------------
   // Active Pack Mode View
   // ---------------------------------------------------------------------------
-  Widget _buildInPackView(BuildContext context, dynamic formation, PackNotifier packNotifier) {
+  Widget _buildInPackView(
+    BuildContext context,
+    PackFormation formation,
+    PackNotifier packNotifier,
+    bool isCaptain,
+    String currentRiderId,
+  ) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
       children: [
@@ -177,6 +193,8 @@ class PackManagementScreen extends ConsumerWidget {
           formation: formation,
           onExpandMap: onExpandMap,
           qrPayload: packNotifier.generateQrPayload(),
+          isCaptain: isCaptain,
+          onToggleLock: (val) => packNotifier.toggleRoomLock(val),
         ),
         const SizedBox(height: 16),
 
@@ -209,12 +227,27 @@ class PackManagementScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
 
-        // 4. List of Convoy Participants
+        // 4. List of Convoy Participants with Role Badges & Captain Moderation
         ...formation.members.map((member) {
+          final isSelf = member.id == currentRiderId || member.status == PackMemberStatus.lead;
           return Padding(
             padding: const EdgeInsets.only(bottom: 10.0),
             child: PackRosterCard(
               member: member,
+              canModerate: isCaptain && !isSelf,
+              onRoleChanged: (newRole) {
+                packNotifier.assignMemberRole(member.id, newRole);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      '${member.callsign} designated as ${newRole == PackRole.tailGunner ? "Tail Gunner (Sweeper)" : "Pack Member"}',
+                    ),
+                    backgroundColor: AppColors.primary,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
+              onKick: () => _confirmKickMember(context, packNotifier, member),
               onPing: () {
                 packNotifier.pingRider(member.id);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -261,9 +294,33 @@ class PackManagementScreen extends ConsumerWidget {
             style: AppTypography.bodySm.copyWith(fontSize: 11, color: AppColors.textSecondary),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
 
-        // 6. Leave Convoy Room Action
+        // 6. Captain Disband Convoy Action
+        if (isCaptain) ...[
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _confirmDisbandConvoy(context, packNotifier, formation.packCode),
+              icon: const Icon(Icons.power_settings_new, size: 18, color: AppColors.alertCritical),
+              label: Text(
+                'Disband Convoy Room (Road Captain)',
+                style: AppTypography.labelMd.copyWith(
+                  color: AppColors.alertCritical,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.alertCritical),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        // 7. Leave Convoy Room Action (Return to Solo Mode)
         Center(
           child: TextButton.icon(
             onPressed: () => _confirmLeavePack(context, packNotifier, formation.packCode),
@@ -399,6 +456,28 @@ class PackManagementScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+
+              // Optical Camera QR Code Scanner Button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _openCameraScanner(context, packNotifier),
+                  icon: const Icon(Icons.qr_code_scanner, size: 18, color: AppColors.secondary),
+                  label: Text(
+                    'Scan QR Code / Share Link',
+                    style: AppTypography.labelMd.copyWith(
+                      color: AppColors.secondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.secondary),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -425,6 +504,44 @@ class PackManagementScreen extends ConsumerWidget {
   }
 
   // ---------------------------------------------------------------------------
+  // Camera QR Scanner Modal
+  // ---------------------------------------------------------------------------
+  Future<void> _openCameraScanner(BuildContext context, PackNotifier notifier) async {
+    final scannedResult = await CameraQrScannerModal.show(context);
+    if (scannedResult != null && scannedResult.isNotEmpty && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Processing convoy QR: $scannedResult'),
+          backgroundColor: AppColors.primary,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+      try {
+        await notifier.scanAndJoinQr(scannedResult);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Successfully joined convoy via optical QR scanner!'),
+              backgroundColor: AppColors.telemetryEmerald,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception: ', '')),
+              backgroundColor: AppColors.alertCritical,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Dialogs
   // ---------------------------------------------------------------------------
   void _confirmLeavePack(BuildContext context, PackNotifier notifier, String packCode) {
@@ -433,11 +550,11 @@ class PackManagementScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
+        title: const Row(
           children: [
-            const Icon(Icons.exit_to_app, color: AppColors.alertCritical),
-            const SizedBox(width: 8),
-            const Text('Leave Convoy Room?'),
+            Icon(Icons.exit_to_app, color: AppColors.alertCritical),
+            SizedBox(width: 8),
+            Text('Leave Convoy Room?'),
           ],
         ),
         content: Text(
@@ -472,6 +589,98 @@ class PackManagementScreen extends ConsumerWidget {
     );
   }
 
+  void _confirmKickMember(BuildContext context, PackNotifier notifier, PackMember member) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.person_remove, color: AppColors.alertCritical),
+            const SizedBox(width: 8),
+            Text('Kick ${member.callsign}?'),
+          ],
+        ),
+        content: Text(
+          'Remove ${member.callsign} from the convoy? They will be detached from live pack telemetry.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: AppTypography.labelMd.copyWith(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await notifier.kickMember(member.id);
+              if (ctx.mounted) {
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${member.callsign} removed from convoy.'),
+                    backgroundColor: AppColors.alertCritical,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.alertCritical,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Kick Rider'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDisbandConvoy(BuildContext context, PackNotifier notifier, String packCode) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.alertCritical),
+            SizedBox(width: 8),
+            Text('Disband Convoy?'),
+          ],
+        ),
+        content: Text(
+          'As Road Captain, disbanding convoy "$packCode" will permanently end the session for all riders and clean up live spatial telemetry state.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel', style: AppTypography.labelMd.copyWith(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await notifier.disbandConvoy();
+              if (ctx.mounted) {
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Convoy room disbanded.'),
+                    backgroundColor: AppColors.alertCritical,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.alertCritical,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Disband Room'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showJoinPackDialog(BuildContext context, PackNotifier notifier) {
     final controller = TextEditingController(text: 'GN-');
     String? localError;
@@ -484,11 +693,11 @@ class PackManagementScreen extends ConsumerWidget {
           return AlertDialog(
             backgroundColor: AppColors.cardBg,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
+            title: const Row(
               children: [
-                const Icon(Icons.group_add, color: AppColors.primary),
-                const SizedBox(width: 8),
-                const Text('Join Convoy Room'),
+                Icon(Icons.group_add, color: AppColors.primary),
+                SizedBox(width: 8),
+                Text('Join Convoy Room'),
               ],
             ),
             content: Column(
@@ -496,7 +705,7 @@ class PackManagementScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Enter the 6-character convoy code or paste pairing payload shared by the lead:',
+                  'Enter the 6-character convoy code, share link, or paste QR pairing payload:',
                   style: AppTypography.bodySm.copyWith(color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 12),
@@ -511,7 +720,7 @@ class PackManagementScreen extends ConsumerWidget {
                     color: AppColors.primary,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'GN-9482 or QR JSON',
+                    hintText: 'GN-9482 or https://groupnav.app/join/GN-XXXX',
                     filled: true,
                     fillColor: AppColors.surfaceContainerLow,
                     border: OutlineInputBorder(
@@ -532,29 +741,47 @@ class PackManagementScreen extends ConsumerWidget {
                   ),
                 ],
                 const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: isJoining
-                        ? null
-                        : () async {
-                            final data = await Clipboard.getData(Clipboard.kTextPlain);
-                            if (data?.text != null && data!.text!.trim().isNotEmpty) {
-                              setState(() {
-                                controller.text = data.text!.trim();
-                                localError = null;
-                              });
-                            }
-                          },
-                    icon: const Icon(Icons.paste, size: 14, color: AppColors.secondary),
-                    label: Text(
-                      'Paste Clipboard Data',
-                      style: AppTypography.labelSm.copyWith(
-                        color: AppColors.secondary,
-                        fontWeight: FontWeight.w700,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton.icon(
+                      onPressed: isJoining
+                          ? null
+                          : () {
+                              Navigator.of(ctx).pop();
+                              _openCameraScanner(context, notifier);
+                            },
+                      icon: const Icon(Icons.qr_code_scanner, size: 14, color: AppColors.primary),
+                      label: Text(
+                        'Scan QR',
+                        style: AppTypography.labelSm.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
+                    TextButton.icon(
+                      onPressed: isJoining
+                          ? null
+                          : () async {
+                              final data = await Clipboard.getData(Clipboard.kTextPlain);
+                              if (data?.text != null && data!.text!.trim().isNotEmpty) {
+                                setState(() {
+                                  controller.text = data.text!.trim();
+                                  localError = null;
+                                });
+                              }
+                            },
+                      icon: const Icon(Icons.paste, size: 14, color: AppColors.secondary),
+                      label: Text(
+                        'Paste Clipboard',
+                        style: AppTypography.labelSm.copyWith(
+                          color: AppColors.secondary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -624,11 +851,11 @@ class PackManagementScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
+        title: const Row(
           children: [
-            const Icon(Icons.emergency, color: AppColors.alertCritical),
-            const SizedBox(width: 8),
-            const Text('Confirm Pack SOS'),
+            Icon(Icons.emergency, color: AppColors.alertCritical),
+            SizedBox(width: 8),
+            Text('Confirm Pack SOS'),
           ],
         ),
         content: const Text(

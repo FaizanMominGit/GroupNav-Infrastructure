@@ -9,6 +9,9 @@ class PackFormation {
   final bool isInPack;
   final String formationType;
   final List<PackMember> members;
+  final bool isLocked;
+  final String hostRiderId;
+  final String status;
 
   const PackFormation({
     this.packId = '',
@@ -19,7 +22,18 @@ class PackFormation {
     this.isInPack = false,
     this.formationType = 'STAGGERED',
     this.members = const [],
+    this.isLocked = false,
+    this.hostRiderId = '',
+    this.status = 'active',
   });
+
+  String get shareLink => 'https://groupnav.app/join/$packCode';
+
+  bool isCaptain(String? riderId) {
+    if (hostRiderId.isNotEmpty && riderId == hostRiderId) return true;
+    final leadMember = members.where((m) => m.isRoadCaptain).firstOrNull;
+    return leadMember != null && leadMember.id == riderId;
+  }
 
   String get formattedRadius {
     if (geofenceRadiusMeters >= 1000) {
@@ -64,6 +78,9 @@ class PackFormation {
     bool? isInPack,
     String? formationType,
     List<PackMember>? members,
+    bool? isLocked,
+    String? hostRiderId,
+    String? status,
   }) {
     return PackFormation(
       packId: packId ?? this.packId,
@@ -74,6 +91,9 @@ class PackFormation {
       isInPack: isInPack ?? this.isInPack,
       formationType: formationType ?? this.formationType,
       members: members ?? this.members,
+      isLocked: isLocked ?? this.isLocked,
+      hostRiderId: hostRiderId ?? this.hostRiderId,
+      status: status ?? this.status,
     );
   }
 }

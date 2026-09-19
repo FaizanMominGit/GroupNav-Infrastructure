@@ -8,17 +8,23 @@ import '../../radar/services/iot_telemetry_service.dart';
 import '../models/pack_formation.dart';
 import '../models/pack_member.dart';
 import '../services/dynamodb_pack_service.dart';
+import '../services/qr_scanner_service.dart';
 
 final dynamoDbPackServiceProvider = Provider<DynamoDbPackService>((ref) {
   final config = ref.watch(clientConfigProvider);
   return DynamoDbPackService(config: config);
 });
 
+final qrScannerServiceProvider = Provider<IQrScannerService>((ref) {
+  return ProductionQrScannerService();
+});
+
 final packNotifierProvider = StateNotifierProvider<PackNotifier, PackFormation>((ref) {
   final radarNotifier = ref.watch(radarNotifierProvider.notifier);
   final packService = ref.watch(dynamoDbPackServiceProvider);
   final telemetryService = ref.watch(iotTelemetryServiceProvider);
-  return PackNotifier(radarNotifier, packService, ref, telemetryService);
+  final qrService = ref.watch(qrScannerServiceProvider);
+  return PackNotifier(radarNotifier, packService, ref, telemetryService, qrService);
 });
 
 class PackNotifier extends StateNotifier<PackFormation> {
@@ -26,6 +32,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
   final DynamoDbPackService? _packService;
   final Ref? _ref;
   final IotTelemetryService? _telemetryService;
+  final IQrScannerService? _qrScannerService;
   Timer? _rosterSyncTimer;
 
   PackNotifier([
@@ -33,6 +40,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
     this._packService,
     this._ref,
     this._telemetryService,
+    this._qrScannerService,
   ]) : super(_soloFormation()) {
     _initRiderIdentity();
   }
@@ -56,6 +64,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
           offsetDescription: 'Solo Rider',
           latencyMs: 0,
           isLeader: true,
+          role: PackRole.roadCaptain,
         ),
       ],
     );
@@ -124,6 +133,79 @@ class PackNotifier extends StateNotifier<PackFormation> {
     });
   }
 
+  /// Promote or demote a member's role (Road Captain only)
+  Future<void> assignMemberRole(String memberId, PackRole newRole) async {
+    final updatedMembers = state.members.map((m) {
+      if (m.id == memberId) {
+        final newDesc = newRole == PackRole.tailGunner
+            ? 'Tail Gunner (Sweeper)'
+            : (newRole == PackRole.roadCaptain ? 'Road Captain' : 'Pack Rider');
+        return m.copyWith(
+          role: newRole,
+          offsetDescription: newDesc,
+          isLeader: newRole == PackRole.roadCaptain,
+        );
+      }
+      return m;
+    }).toList();
+
+    state = state.copyWith(members: updatedMembers);
+
+    if (state.isInPack && state.packCode.isNotEmpty && _ref != null && _packService != null) {
+      final auth = _ref.read(authNotifierProvider);
+      final creds = auth.awsCredentials;
+      if (creds != null) {
+        _packService.updateMemberRole(
+          packCode: state.packCode,
+          memberId: memberId,
+          newRole: newRole,
+          awsCredentials: creds,
+        ).catchError((e) {
+          debugPrint('[PackNotifier] Role update AWS error: $e');
+        });
+      }
+    }
+  }
+
+  /// Kick a disruptive member from the convoy (Road Captain only)
+  Future<void> kickMember(String memberId) async {
+    final updatedMembers = state.members.where((m) => m.id != memberId).toList();
+    state = state.copyWith(members: updatedMembers);
+
+    if (state.isInPack && state.packCode.isNotEmpty && _ref != null && _packService != null) {
+      final auth = _ref.read(authNotifierProvider);
+      final creds = auth.awsCredentials;
+      if (creds != null) {
+        _packService.kickMember(
+          packCode: state.packCode,
+          memberId: memberId,
+          awsCredentials: creds,
+        ).catchError((e) {
+          debugPrint('[PackNotifier] Kick member AWS error: $e');
+        });
+      }
+    }
+  }
+
+  /// Toggle room lock against new entrants (Road Captain only)
+  Future<void> toggleRoomLock(bool isLocked) async {
+    state = state.copyWith(isLocked: isLocked);
+
+    if (state.isInPack && state.packCode.isNotEmpty && _ref != null && _packService != null) {
+      final auth = _ref.read(authNotifierProvider);
+      final creds = auth.awsCredentials;
+      if (creds != null) {
+        _packService.setPackLocked(
+          packCode: state.packCode,
+          isLocked: isLocked,
+          awsCredentials: creds,
+        ).catchError((e) {
+          debugPrint('[PackNotifier] Set lock AWS error: $e');
+        });
+      }
+    }
+  }
+
   /// Leave the active convoy pack and revert to Solo Ride Mode
   Future<void> leavePack() async {
     _rosterSyncTimer?.cancel();
@@ -148,8 +230,34 @@ class PackNotifier extends StateNotifier<PackFormation> {
     _telemetryService?.updateActivePack('');
   }
 
-  /// Disband active convoy (alias to leavePack)
-  Future<void> disbandConvoy() => leavePack();
+  /// Disband active convoy for everyone (Road Captain only)
+  Future<void> disbandConvoy() async {
+    if (state.isInPack && state.packCode.isNotEmpty && _ref != null && _packService != null) {
+      final auth = _ref.read(authNotifierProvider);
+      final creds = auth.awsCredentials;
+      if (creds != null) {
+        try {
+          await _packService.disbandPack(
+            packCode: state.packCode,
+            awsCredentials: creds,
+          );
+        } catch (e) {
+          debugPrint('[PackNotifier] Disband pack AWS error: $e');
+        }
+      }
+    }
+    await leavePack();
+  }
+
+  /// Scan QR payload and join the pack automatically
+  Future<void> scanAndJoinQr(String qrData) async {
+    final qrService = _qrScannerService ?? ProductionQrScannerService();
+    final parsedCode = qrService.parseQrPayload(qrData);
+    if (parsedCode == null || parsedCode.isEmpty) {
+      throw Exception('Invalid GroupNav QR code or link format.');
+    }
+    await joinPack(parsedCode);
+  }
 
   /// Create a real convoy room on AWS DynamoDB
   Future<void> createPack({
@@ -178,6 +286,8 @@ class PackNotifier extends StateNotifier<PackFormation> {
         geofenceRadiusMeters: effectiveRadius,
         formationType: formationType,
         isTelemetrySyncActive: true,
+        isLocked: false,
+        hostRiderId: 'solo-rider',
         members: [
           const PackMember(
             id: 'solo-rider',
@@ -186,9 +296,10 @@ class PackNotifier extends StateNotifier<PackFormation> {
             status: PackMemberStatus.lead,
             speedKmh: 0.0,
             offsetMeters: 0.0,
-            offsetDescription: 'Convoy Lead',
+            offsetDescription: 'Road Captain (Host)',
             latencyMs: 0,
             isLeader: true,
+            role: PackRole.roadCaptain,
           ),
         ],
       );
@@ -218,6 +329,8 @@ class PackNotifier extends StateNotifier<PackFormation> {
         geofenceRadiusMeters: effectiveRadius,
         formationType: formationType,
         isTelemetrySyncActive: true,
+        isLocked: false,
+        hostRiderId: 'solo-rider',
         members: [
           const PackMember(
             id: 'solo-rider',
@@ -229,6 +342,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
             offsetDescription: 'Road Captain (Host)',
             latencyMs: 0,
             isLeader: true,
+            role: PackRole.roadCaptain,
           ),
         ],
       );
@@ -264,7 +378,10 @@ class PackNotifier extends StateNotifier<PackFormation> {
       awsCredentials: creds,
     );
 
-    state = formation.copyWith(isInPack: true);
+    state = formation.copyWith(
+      isInPack: true,
+      hostRiderId: riderId,
+    );
     _radarNotifier?.updateGeofenceRadius(effectiveRadius);
     _telemetryService?.updateActivePack(formation.packCode);
     _startRosterPolling(code);
@@ -279,6 +396,9 @@ class PackNotifier extends StateNotifier<PackFormation> {
         cleanCode = decoded['code']?.toString() ?? cleanCode;
       } catch (_) {}
     }
+
+    final qrService = _qrScannerService ?? ProductionQrScannerService();
+    cleanCode = qrService.parseQrPayload(cleanCode) ?? cleanCode;
 
     cleanCode = cleanCode.toUpperCase();
     if (!cleanCode.startsWith('GN-') && !cleanCode.startsWith('PACK-')) {
@@ -302,11 +422,6 @@ class PackNotifier extends StateNotifier<PackFormation> {
     final creds = auth.awsCredentials;
     if (creds == null) {
       throw Exception('Not authenticated with AWS. Please sign in first.');
-    }
-
-    cleanCode = cleanCode.toUpperCase();
-    if (!cleanCode.startsWith('GN-') && !cleanCode.startsWith('PACK-')) {
-      cleanCode = 'GN-$cleanCode';
     }
 
     final pilot = auth.pilot;

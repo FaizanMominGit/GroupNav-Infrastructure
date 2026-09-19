@@ -33,15 +33,15 @@ Current status indicator:
 - [x] **In-Person QR Code Rendezvous Generator**: Generate an interactive QR code containing the full pack rendezvous configuration for instant group pairing.
 - [x] **Pack Member Roster**: Live list of convoy members showing callsign, bike model, status (Leading, Cruising, Tail-gunning), and connection state.
 - [x] **Decoupled Pack Session**: Switch freely between Solo Ride Mode and Pack Rooms without losing local data or logging out.
-- [ ] **Camera QR Code Scanner**: Scan another rider's screen or printed bike sticker using the physical phone camera.
-- [ ] **Pack Roles & Hierarchy**:
+- [x] **Camera QR Code Scanner**: Scan another rider's screen or printed bike sticker using the physical phone camera.
+- [x] **Pack Roles & Hierarchy**:
   - **Road Captain (Host)**: Defines route, sets target speed, controls pack settings.
   - **Tail Gunner (Sweeper)**: Keeps track of trailing bikes, triggers regroup alerts.
   - **Pack Members**: Regular convoy participants with live telemetry sharing.
-- [ ] **Universal Share Links**: Deep links via WhatsApp, Telegram, SMS, or AirDrop (e.g., `groupnav.app/join/ABC123`).
-- [ ] **Pack Moderation**: Captain permissions to kick disruptive riders or lock the room to prevent new entries.
+- [x] **Universal Share Links**: Deep links via WhatsApp, Telegram, SMS, or AirDrop (e.g., `https://groupnav.app/join/GN-XXXX`).
+- [x] **Pack Moderation**: Captain permissions to kick disruptive riders or lock the room to prevent new entries.
 - [x] **Pack Formations**: Preset riding formations (Staggered 2-second spacing, Single File for twisties, Free Cruise) with active discipline indicators.
-- [ ] **Disband / End Convoy**: Captain closes the room and archives the group session for all participants.
+- [x] **Disband / End Convoy**: Captain closes the room and archives the group session for all participants.
 
 ---
 

@@ -8,6 +8,12 @@ enum PackMemberStatus {
   offline,
 }
 
+enum PackRole {
+  roadCaptain,
+  tailGunner,
+  packMember,
+}
+
 class PackMember {
   final String id;
   final String callsign;
@@ -20,6 +26,7 @@ class PackMember {
   final String? lastSeenDescription;
   final bool isLeader;
   final String? warningDescription;
+  final PackRole role;
 
   const PackMember({
     required this.id,
@@ -33,7 +40,44 @@ class PackMember {
     this.lastSeenDescription,
     this.isLeader = false,
     this.warningDescription,
+    this.role = PackRole.packMember,
   });
+
+  bool get isRoadCaptain => role == PackRole.roadCaptain || isLeader;
+  bool get isTailGunner => role == PackRole.tailGunner;
+
+  String get roleLabel {
+    switch (role) {
+      case PackRole.roadCaptain:
+        return 'Road Captain';
+      case PackRole.tailGunner:
+        return 'Tail Gunner';
+      case PackRole.packMember:
+        return 'Pack Member';
+    }
+  }
+
+  IconData get roleIcon {
+    switch (role) {
+      case PackRole.roadCaptain:
+        return Icons.star;
+      case PackRole.tailGunner:
+        return Icons.shield_outlined;
+      case PackRole.packMember:
+        return Icons.two_wheeler;
+    }
+  }
+
+  Color get roleBadgeColor {
+    switch (role) {
+      case PackRole.roadCaptain:
+        return const Color(0xFFEAB308); // Gold
+      case PackRole.tailGunner:
+        return AppColors.telemetryEmerald; // Emerald
+      case PackRole.packMember:
+        return AppColors.primary; // Blue
+    }
+  }
 
   String get statusBadgeLabel {
     switch (status) {
@@ -124,6 +168,7 @@ class PackMember {
     String? lastSeenDescription,
     bool? isLeader,
     String? warningDescription,
+    PackRole? role,
   }) {
     return PackMember(
       id: id ?? this.id,
@@ -137,6 +182,7 @@ class PackMember {
       lastSeenDescription: lastSeenDescription ?? this.lastSeenDescription,
       isLeader: isLeader ?? this.isLeader,
       warningDescription: warningDescription ?? this.warningDescription,
+      role: role ?? this.role,
     );
   }
 }

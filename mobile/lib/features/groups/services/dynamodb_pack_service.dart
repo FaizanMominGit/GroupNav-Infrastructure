@@ -38,6 +38,7 @@ class DynamoDbPackService {
         'initials': {'S': _extractInitials(hostCallsign)},
         'vehicleClass': {'S': bikeModel},
         'isLeader': {'BOOL': true},
+        'role': {'S': 'roadCaptain'},
         'speedKmh': {'N': '0.0'},
         'offsetMeters': {'N': '0.0'},
         'offsetDescription': {'S': 'Road Captain'},
@@ -56,6 +57,8 @@ class DynamoDbPackService {
         'hostRiderId': {'S': hostRiderId},
         'formationType': {'S': formationType},
         'geofenceRadiusMeters': {'N': geofenceRadiusMeters.toString()},
+        'isLocked': {'BOOL': false},
+        'status': {'S': 'active'},
         'createdAt': {'N': DateTime.now().millisecondsSinceEpoch.toString()},
         'updatedAt': {'N': DateTime.now().millisecondsSinceEpoch.toString()},
         'members': {
@@ -169,6 +172,10 @@ class DynamoDbPackService {
       throw Exception("Pack room '$packCode' does not exist on AWS. Please verify the room code.");
     }
 
+    if (existingPack.isLocked) {
+      throw Exception("Convoy room '$packCode' is locked by the Road Captain. New entries are restricted.");
+    }
+
     // 2. Check if rider is already in the pack
     final alreadyInPack = existingPack.members.any((m) => m.id == riderId);
 
@@ -181,6 +188,7 @@ class DynamoDbPackService {
           'initials': {'S': _extractInitials(callsign)},
           'vehicleClass': {'S': bikeModel},
           'isLeader': {'BOOL': false},
+          'role': {'S': 'packMember'},
           'speedKmh': {'N': '0.0'},
           'offsetMeters': {'N': '0.0'},
           'offsetDescription': {'S': 'Pack Rider'},
@@ -309,6 +317,60 @@ class DynamoDbPackService {
     debugPrint('[DynamoDbPackService] Rider $riderId left pack $packCode on AWS.');
   }
 
+  /// Kick a member from the pack room on AWS DynamoDB
+  Future<void> kickMember({
+    required String packCode,
+    required String memberId,
+    required Map<String, String> awsCredentials,
+  }) async {
+    final pack = await getPack(packCode: packCode, awsCredentials: awsCredentials);
+    if (pack == null) return;
+
+    final updatedMembers = pack.members
+        .where((m) => m.id != memberId)
+        .map((m) => {
+              'M': {
+                'id': {'S': m.id},
+                'callsign': {'S': m.callsign.replaceAll(' (You)', '')},
+                'initials': {'S': m.initials},
+                'isLeader': {'BOOL': m.isLeader},
+                'role': {'S': m.role.name},
+                'speedKmh': {'N': m.speedKmh.toString()},
+                'offsetMeters': {'N': m.offsetMeters.toString()},
+                'offsetDescription': {'S': m.offsetDescription},
+                'latencyMs': {'N': (m.latencyMs ?? 0).toString()},
+                'status': {'S': m.status.name},
+              }
+            })
+        .toList();
+
+    final body = json.encode({
+      'TableName': _tableName,
+      'Key': {'packCode': {'S': packCode}},
+      'UpdateExpression': 'SET #members = :members, #updatedAt = :now',
+      'ExpressionAttributeNames': {'#members': 'members', '#updatedAt': 'updatedAt'},
+      'ExpressionAttributeValues': {
+        ':members': {'L': updatedMembers},
+        ':now': {'N': DateTime.now().millisecondsSinceEpoch.toString()},
+      },
+    });
+
+    final headers = _signer.signHttpRequest(
+      method: 'POST',
+      path: '/',
+      service: 'dynamodb',
+      host: _dynamoHost,
+      target: 'DynamoDB_20120810.UpdateItem',
+      body: body,
+      accessKeyId: awsCredentials['AccessKeyId']!,
+      secretKey: awsCredentials['SecretKey']!,
+      sessionToken: awsCredentials['SessionToken'],
+    );
+
+    await http.post(_endpoint, headers: headers, body: body).timeout(const Duration(seconds: 10));
+    debugPrint('[DynamoDbPackService] Rider $memberId was kicked from pack $packCode on AWS.');
+  }
+
   /// Update geofence radius on AWS DynamoDB
   Future<void> updateGeofenceRadius({
     required String packCode,
@@ -383,6 +445,14 @@ class DynamoDbPackService {
         status = PackMemberStatus.offline;
       }
 
+      final roleStr = map['role']?['S'] as String? ?? (isLeader ? 'roadCaptain' : 'packMember');
+      PackRole role = PackRole.packMember;
+      if (roleStr == 'roadCaptain' || isLeader) {
+        role = PackRole.roadCaptain;
+      } else if (roleStr == 'tailGunner') {
+        role = PackRole.tailGunner;
+      }
+
       members.add(PackMember(
         id: id,
         callsign: callsign,
@@ -393,10 +463,14 @@ class DynamoDbPackService {
         offsetDescription: offsetDesc,
         latencyMs: latencyMs,
         isLeader: isLeader,
+        role: role,
       ));
     }
 
     final formationType = item['formationType']?['S'] as String? ?? 'STAGGERED';
+    final isLocked = item['isLocked']?['BOOL'] as bool? ?? false;
+    final hostRiderId = item['hostRiderId']?['S'] as String? ?? '';
+    final status = item['status']?['S'] as String? ?? 'active';
 
     return PackFormation(
       packId: packId,
@@ -407,7 +481,128 @@ class DynamoDbPackService {
       isTelemetrySyncActive: true,
       isInPack: packCode.isNotEmpty,
       members: members,
+      isLocked: isLocked,
+      hostRiderId: hostRiderId,
+      status: status,
     );
+  }
+
+  /// Update a member's tactical role (e.g. promote to Tail Gunner)
+  Future<void> updateMemberRole({
+    required String packCode,
+    required String memberId,
+    required PackRole newRole,
+    required Map<String, String> awsCredentials,
+  }) async {
+    final pack = await getPack(packCode: packCode, awsCredentials: awsCredentials);
+    if (pack == null) return;
+
+    final updatedMembers = pack.members.map((m) {
+      final updatedRole = m.id == memberId ? newRole : m.role;
+      return {
+        'M': {
+          'id': {'S': m.id},
+          'callsign': {'S': m.callsign.replaceAll(' (You)', '')},
+          'initials': {'S': m.initials},
+          'isLeader': {'BOOL': updatedRole == PackRole.roadCaptain},
+          'role': {'S': updatedRole.name},
+          'speedKmh': {'N': m.speedKmh.toString()},
+          'offsetMeters': {'N': m.offsetMeters.toString()},
+          'offsetDescription': {'S': updatedRole == PackRole.tailGunner ? 'Tail Gunner (Sweeper)' : m.offsetDescription},
+          'latencyMs': {'N': (m.latencyMs ?? 0).toString()},
+          'status': {'S': m.status.name},
+        }
+      };
+    }).toList();
+
+    final body = json.encode({
+      'TableName': _tableName,
+      'Key': {'packCode': {'S': packCode}},
+      'UpdateExpression': 'SET #members = :members, #updatedAt = :now',
+      'ExpressionAttributeNames': {'#members': 'members', '#updatedAt': 'updatedAt'},
+      'ExpressionAttributeValues': {
+        ':members': {'L': updatedMembers},
+        ':now': {'N': DateTime.now().millisecondsSinceEpoch.toString()},
+      },
+    });
+
+    final headers = _signer.signHttpRequest(
+      method: 'POST',
+      path: '/',
+      service: 'dynamodb',
+      host: _dynamoHost,
+      target: 'DynamoDB_20120810.UpdateItem',
+      body: body,
+      accessKeyId: awsCredentials['AccessKeyId']!,
+      secretKey: awsCredentials['SecretKey']!,
+      sessionToken: awsCredentials['SessionToken'],
+    );
+
+    await http.post(_endpoint, headers: headers, body: body).timeout(const Duration(seconds: 10));
+  }
+
+  /// Lock or unlock a pack room against new joiners
+  Future<void> setPackLocked({
+    required String packCode,
+    required bool isLocked,
+    required Map<String, String> awsCredentials,
+  }) async {
+    final body = json.encode({
+      'TableName': _tableName,
+      'Key': {'packCode': {'S': packCode}},
+      'UpdateExpression': 'SET #isLocked = :isLocked, #updatedAt = :now',
+      'ExpressionAttributeNames': {'#isLocked': 'isLocked', '#updatedAt': 'updatedAt'},
+      'ExpressionAttributeValues': {
+        ':isLocked': {'BOOL': isLocked},
+        ':now': {'N': DateTime.now().millisecondsSinceEpoch.toString()},
+      },
+    });
+
+    final headers = _signer.signHttpRequest(
+      method: 'POST',
+      path: '/',
+      service: 'dynamodb',
+      host: _dynamoHost,
+      target: 'DynamoDB_20120810.UpdateItem',
+      body: body,
+      accessKeyId: awsCredentials['AccessKeyId']!,
+      secretKey: awsCredentials['SecretKey']!,
+      sessionToken: awsCredentials['SessionToken'],
+    );
+
+    await http.post(_endpoint, headers: headers, body: body).timeout(const Duration(seconds: 10));
+  }
+
+  /// Disband pack and close session on AWS DynamoDB
+  Future<void> disbandPack({
+    required String packCode,
+    required Map<String, String> awsCredentials,
+  }) async {
+    final body = json.encode({
+      'TableName': _tableName,
+      'Key': {'packCode': {'S': packCode}},
+      'UpdateExpression': 'SET #status = :disbanded, #members = :empty, #updatedAt = :now',
+      'ExpressionAttributeNames': {'#status': 'status', '#members': 'members', '#updatedAt': 'updatedAt'},
+      'ExpressionAttributeValues': {
+        ':disbanded': {'S': 'disbanded'},
+        ':empty': {'L': []},
+        ':now': {'N': DateTime.now().millisecondsSinceEpoch.toString()},
+      },
+    });
+
+    final headers = _signer.signHttpRequest(
+      method: 'POST',
+      path: '/',
+      service: 'dynamodb',
+      host: _dynamoHost,
+      target: 'DynamoDB_20120810.UpdateItem',
+      body: body,
+      accessKeyId: awsCredentials['AccessKeyId']!,
+      secretKey: awsCredentials['SecretKey']!,
+      sessionToken: awsCredentials['SessionToken'],
+    );
+
+    await http.post(_endpoint, headers: headers, body: body).timeout(const Duration(seconds: 10));
   }
 
   String _extractInitials(String name) {

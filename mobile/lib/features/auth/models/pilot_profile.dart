@@ -5,6 +5,9 @@ class PilotProfile {
   final String beaconColor;
   final String? cognitoIdentityId;
   final String? cognitoSub;
+  final String? walletAddress;
+  final String authProviderType;
+  final double navTokenBalance;
 
   const PilotProfile({
     required this.phoneOrEmail,
@@ -13,7 +16,18 @@ class PilotProfile {
     required this.beaconColor,
     this.cognitoIdentityId,
     this.cognitoSub,
+    this.walletAddress,
+    this.authProviderType = 'cognito',
+    this.navTokenBalance = 0.0,
   });
+
+  bool get isWalletConnected => walletAddress != null && walletAddress!.isNotEmpty;
+
+  String? get truncatedWallet {
+    if (walletAddress == null || walletAddress!.isEmpty) return null;
+    if (walletAddress!.length <= 10) return walletAddress;
+    return '${walletAddress!.substring(0, 6)}...${walletAddress!.substring(walletAddress!.length - 4)}';
+  }
 
   int get beaconColorValue {
     try {
@@ -31,6 +45,9 @@ class PilotProfile {
     'beaconColor': beaconColor,
     'cognitoIdentityId': cognitoIdentityId,
     'cognitoSub': cognitoSub,
+    'walletAddress': walletAddress,
+    'authProviderType': authProviderType,
+    'navTokenBalance': navTokenBalance,
   };
 
   factory PilotProfile.fromJson(Map<String, dynamic> json) {
@@ -41,6 +58,9 @@ class PilotProfile {
       beaconColor: json['beaconColor'] as String? ?? '#0066FF',
       cognitoIdentityId: json['cognitoIdentityId'] as String?,
       cognitoSub: json['cognitoSub'] as String?,
+      walletAddress: json['walletAddress'] as String?,
+      authProviderType: json['authProviderType'] as String? ?? 'cognito',
+      navTokenBalance: (json['navTokenBalance'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
@@ -51,6 +71,9 @@ class PilotProfile {
     String? beaconColor,
     String? cognitoIdentityId,
     String? cognitoSub,
+    String? walletAddress,
+    String? authProviderType,
+    double? navTokenBalance,
   }) {
     return PilotProfile(
       phoneOrEmail: phoneOrEmail ?? this.phoneOrEmail,
@@ -59,6 +82,9 @@ class PilotProfile {
       beaconColor: beaconColor ?? this.beaconColor,
       cognitoIdentityId: cognitoIdentityId ?? this.cognitoIdentityId,
       cognitoSub: cognitoSub ?? this.cognitoSub,
+      walletAddress: walletAddress ?? this.walletAddress,
+      authProviderType: authProviderType ?? this.authProviderType,
+      navTokenBalance: navTokenBalance ?? this.navTokenBalance,
     );
   }
 }

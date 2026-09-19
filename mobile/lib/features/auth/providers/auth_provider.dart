@@ -5,6 +5,8 @@ import '../models/auth_state.dart';
 import '../models/pilot_profile.dart';
 import '../services/biometric_auth_service.dart';
 import '../services/cognito_auth_service.dart';
+import '../services/social_auth_service.dart';
+import '../services/web3_wallet_service.dart';
 
 final clientConfigProvider = Provider<ClientConfig>((ref) {
   throw UnimplementedError('clientConfigProvider must be initialized in ProviderScope overrides');
@@ -19,15 +21,32 @@ final biometricServiceProvider = Provider<IBiometricService>((ref) {
   return LocalBiometricService();
 });
 
+final socialAuthServiceProvider = Provider<ISocialAuthService>((ref) {
+  return LocalSocialAuthService();
+});
+
+final web3WalletServiceProvider = Provider<IWeb3WalletService>((ref) {
+  return ProductionWeb3WalletService();
+});
+
 final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final authService = ref.watch(cognitoAuthServiceProvider);
   final biometricService = ref.watch(biometricServiceProvider);
-  return AuthNotifier(authService, biometricService: biometricService);
+  final socialAuthService = ref.watch(socialAuthServiceProvider);
+  final web3WalletService = ref.watch(web3WalletServiceProvider);
+  return AuthNotifier(
+    authService,
+    biometricService: biometricService,
+    socialAuthService: socialAuthService,
+    web3WalletService: web3WalletService,
+  );
 });
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final CognitoAuthService _authService;
   final IBiometricService _biometricService;
+  final ISocialAuthService _socialAuthService;
+  final IWeb3WalletService _web3WalletService;
   Timer? _countdownTimer;
 
   String _email = '';
@@ -37,8 +56,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
   String _selectedBeaconColor = '#0066FF';
   bool _isSignUpMode = false;
 
-  AuthNotifier(this._authService, {IBiometricService? biometricService})
-      : _biometricService = biometricService ?? LocalBiometricService(),
+  AuthNotifier(
+    this._authService, {
+    IBiometricService? biometricService,
+    ISocialAuthService? socialAuthService,
+    IWeb3WalletService? web3WalletService,
+  })  : _biometricService = biometricService ?? LocalBiometricService(),
+        _socialAuthService = socialAuthService ?? LocalSocialAuthService(),
+        _web3WalletService = web3WalletService ?? ProductionWeb3WalletService(),
         super(const AuthState()) {
     checkSavedSession();
     checkBiometricAvailability();
@@ -187,7 +212,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       final isConfirmed = result['userConfirmed'] as bool? ?? false;
       if (isConfirmed) {
-        // Automatically sign in if auto-confirmed
         return await signIn(email: _email, password: _password);
       } else {
         _startResendTimer(60);
@@ -224,7 +248,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         confirmationCode: code.trim(),
       );
 
-      // Successfully confirmed, proceed to sign in with credentials
       return await signIn(email: _email, password: _password);
     } catch (e) {
       state = state.copyWith(
@@ -274,11 +297,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e) {
       final msg = e.toString().replaceFirst('Exception: ', '');
       if (msg.contains('UserNotConfirmedException')) {
-        // Needs confirmation
         _startResendTimer(60);
         state = state.copyWith(
           status: AuthStatus.otpPending,
-          errorMessage: 'Account not yet confirmed. Please enter the verification code sent to your email.',
+          errorMessage: 'Account not yet confirmed. Please enter the 6-digit code.',
         );
       } else {
         state = state.copyWith(
@@ -290,26 +312,186 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Resend confirmation code
-  Future<void> resendConfirmationCode() async {
-    if (_email.isEmpty) return;
+  /// Sign in with Google (OAuth2 / Social Federation)
+  Future<bool> signInWithGoogle() async {
+    state = state.copyWith(isSocialAuthLoading: true, errorMessage: null);
+    try {
+      final result = await _socialAuthService.signInWithGoogle();
+      if (result == null) {
+        state = state.copyWith(isSocialAuthLoading: false);
+        return false;
+      }
+
+      final pilot = PilotProfile(
+        phoneOrEmail: result.email,
+        callsign: result.displayName.isNotEmpty ? result.displayName : 'GooglePilot',
+        vehicleClass: _selectedVehicleClass,
+        beaconColor: _selectedBeaconColor,
+        authProviderType: 'google',
+      );
+
+      _countdownTimer?.cancel();
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        pilot: pilot,
+        isSocialAuthLoading: false,
+        errorMessage: null,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isSocialAuthLoading: false,
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
+  /// Sign in with Apple (Sign in with Apple ID)
+  Future<bool> signInWithApple() async {
+    state = state.copyWith(isSocialAuthLoading: true, errorMessage: null);
+    try {
+      final result = await _socialAuthService.signInWithApple();
+      if (result == null) {
+        state = state.copyWith(isSocialAuthLoading: false);
+        return false;
+      }
+
+      final pilot = PilotProfile(
+        phoneOrEmail: result.email,
+        callsign: result.displayName.isNotEmpty ? result.displayName : 'ApplePilot',
+        vehicleClass: _selectedVehicleClass,
+        beaconColor: _selectedBeaconColor,
+        authProviderType: 'apple',
+      );
+
+      _countdownTimer?.cancel();
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        pilot: pilot,
+        isSocialAuthLoading: false,
+        errorMessage: null,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isSocialAuthLoading: false,
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
+  /// Sign in directly via Web3 Wallet (MetaMask, Phantom, WalletConnect) with SIWE
+  Future<bool> signInWithWeb3(
+    Web3WalletType walletType, {
+    Web3Chain chain = Web3Chain.polygon,
+  }) async {
+    state = state.copyWith(isWeb3Connecting: true, errorMessage: null);
+    try {
+      final result = await _web3WalletService.connectWallet(walletType, chain: chain);
+
+      final pilot = PilotProfile(
+        phoneOrEmail: '${result.walletAddress}@depin.groupnav.io',
+        callsign: '0x${result.truncatedAddress.replaceAll("...", "").toLowerCase().substring(0, 4)}',
+        vehicleClass: _selectedVehicleClass,
+        beaconColor: _selectedBeaconColor,
+        walletAddress: result.walletAddress,
+        authProviderType: 'web3',
+        navTokenBalance: result.balanceNAV,
+      );
+
+      _countdownTimer?.cancel();
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        pilot: pilot,
+        connectedWallet: result,
+        isWeb3Connecting: false,
+        errorMessage: null,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isWeb3Connecting: false,
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
+  /// Link a Web3 Wallet to an active pilot account for DePIN proof-of-ride telemetry rewards
+  Future<bool> linkWeb3Wallet(
+    Web3WalletType walletType, {
+    Web3Chain chain = Web3Chain.polygon,
+  }) async {
+    state = state.copyWith(isWeb3Connecting: true, errorMessage: null);
+    try {
+      final result = await _web3WalletService.connectWallet(walletType, chain: chain);
+      final currentPilot = state.pilot;
+      final updatedPilot = currentPilot?.copyWith(
+        walletAddress: result.walletAddress,
+        navTokenBalance: result.balanceNAV,
+      );
+
+      state = state.copyWith(
+        connectedWallet: result,
+        pilot: updatedPilot,
+        isWeb3Connecting: false,
+        errorMessage: null,
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isWeb3Connecting: false,
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
+  /// Disconnect the linked Web3 wallet
+  Future<void> disconnectWeb3Wallet() async {
+    await _web3WalletService.disconnectWallet();
+    state = state.clearConnectedWallet();
+  }
+
+  /// Quick guest / offline ride entry
+  void skipAuth() {
+    _countdownTimer?.cancel();
+    final guestPilot = PilotProfile(
+      phoneOrEmail: 'guest_rider@groupnav.local',
+      callsign: _callsign.isNotEmpty ? _callsign : 'GhostRider',
+      vehicleClass: _selectedVehicleClass,
+      beaconColor: _selectedBeaconColor,
+      authProviderType: 'guest',
+    );
+    state = state.copyWith(
+      status: AuthStatus.authenticated,
+      pilot: guestPilot,
+      errorMessage: null,
+    );
+  }
+
+  /// Resend confirmation code to user's email
+  Future<bool> resendConfirmationCode() async {
+    if (_email.isEmpty) return false;
+
+    state = state.copyWith(errorMessage: null);
+
     try {
       await _authService.resendConfirmationCode(email: _email);
       _startResendTimer(60);
+      return true;
     } catch (e) {
       state = state.copyWith(
         errorMessage: e.toString().replaceFirst('Exception: ', ''),
       );
+      return false;
     }
   }
 
-  void cancelOtp() {
-    _countdownTimer?.cancel();
-    state = state.copyWith(status: AuthStatus.initial, errorMessage: null);
-  }
-
-  /// Request a password reset code for the specified email via AWS Cognito ForgotPassword API
-  Future<Map<String, dynamic>?> sendPasswordResetCode(String email) async {
+  /// Request a password reset code for a forgotten password
+  Future<String?> sendPasswordResetCode(String email) async {
     final trimmedEmail = email.trim();
     if (trimmedEmail.isEmpty || !trimmedEmail.contains('@')) {
       state = state.copyWith(
@@ -326,14 +508,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
 
     try {
-      final details = await _authService.forgotPassword(email: trimmedEmail);
+      final result = await _authService.forgotPassword(email: trimmedEmail);
+      final destination = result['destination'] as String? ?? trimmedEmail;
+      _email = trimmedEmail;
       _startResendTimer(60);
+
       state = state.copyWith(
         isPasswordResetLoading: false,
-        passwordResetDestination: details['destination'] as String? ?? trimmedEmail,
+        passwordResetDestination: destination,
         passwordResetError: null,
       );
-      return details;
+      return destination;
     } catch (e) {
       final msg = e.toString().replaceFirst('Exception: ', '');
       state = state.copyWith(
@@ -344,7 +529,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Confirm password reset with the 6-digit email OTP and update the pilot password
+  /// Submit the confirmation code and new password to AWS Cognito
   Future<bool> confirmPasswordReset({
     required String email,
     required String code,
@@ -404,9 +589,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.clearPasswordReset();
   }
 
+  void cancelOtp() {
+    _countdownTimer?.cancel();
+    state = state.copyWith(
+      status: AuthStatus.initial,
+      resendCountdown: 0,
+      errorMessage: null,
+    );
+  }
+
   Future<void> signOut() async {
     _countdownTimer?.cancel();
     await _authService.signOut();
+    await _socialAuthService.signOut();
+    await _web3WalletService.disconnectWallet();
     state = const AuthState(status: AuthStatus.initial);
   }
 

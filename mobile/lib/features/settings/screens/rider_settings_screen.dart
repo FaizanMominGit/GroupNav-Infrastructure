@@ -4,6 +4,7 @@ import '../../../core/config/client_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../auth/widgets/web3_wallet_modal.dart';
 import '../../groups/providers/pack_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/convoy_alerts_card.dart';
@@ -19,11 +20,37 @@ class RiderSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authNotifierProvider);
     final authNotifier = ref.read(authNotifierProvider.notifier);
     final settings = ref.watch(settingsNotifierProvider);
     final settingsNotifier = ref.read(settingsNotifierProvider.notifier);
     final packFormation = ref.watch(packNotifierProvider);
     final packNotifier = ref.read(packNotifierProvider.notifier);
+
+    void showWeb3WalletModal() {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => Consumer(
+          builder: (context, ref, _) {
+            final currentAuthState = ref.watch(authNotifierProvider);
+            final currentAuthNotifier = ref.read(authNotifierProvider.notifier);
+            return Web3WalletModal(
+              isLinkingMode: true,
+              isConnecting: currentAuthState.isWeb3Connecting,
+              errorMessage: currentAuthState.errorMessage,
+              onConnect: (walletType, chain) async {
+                final success = await currentAuthNotifier.linkWeb3Wallet(walletType, chain: chain);
+                if (success && ctx.mounted) {
+                  Navigator.of(ctx).pop();
+                }
+              },
+            );
+          },
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -152,6 +179,10 @@ class RiderSettingsScreen extends ConsumerWidget {
                   // Section 1: Profile & Identity
                   ProfileIdentityCard(
                     settings: settings,
+                    walletAddress: authState.pilot?.walletAddress,
+                    navBalance: authState.pilot?.navTokenBalance ?? 0.0,
+                    onConnectWallet: showWeb3WalletModal,
+                    onDisconnectWallet: () => authNotifier.disconnectWeb3Wallet(),
                     onUpdateCallsign: settingsNotifier.setCallsign,
                     onUpdateVehicle: settingsNotifier.setVehicle,
                     onUpdateEmergencyContact: settingsNotifier.setEmergencyContact,

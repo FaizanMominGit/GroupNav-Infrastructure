@@ -8,7 +8,9 @@ import '../providers/auth_provider.dart';
 import '../widgets/beacon_color_picker.dart';
 import '../widgets/forgot_password_dialog.dart';
 import '../widgets/otp_verification_dialog.dart';
+import '../widgets/social_auth_buttons.dart';
 import '../widgets/vehicle_class_selector.dart';
+import '../widgets/web3_wallet_modal.dart';
 
 class AuthOnboardingScreen extends ConsumerStatefulWidget {
   const AuthOnboardingScreen({super.key});
@@ -101,6 +103,30 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
             onCancel: () {
               Navigator.of(ctx).pop();
               authNotifier.clearPasswordResetState();
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  void _showWeb3WalletModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Consumer(
+        builder: (context, ref, _) {
+          final authState = ref.watch(authNotifierProvider);
+          final authNotifier = ref.read(authNotifierProvider.notifier);
+          return Web3WalletModal(
+            isConnecting: authState.isWeb3Connecting,
+            errorMessage: authState.errorMessage,
+            onConnect: (walletType, chain) async {
+              final success = await authNotifier.signInWithWeb3(walletType, chain: chain);
+              if (success && ctx.mounted) {
+                Navigator.of(ctx).pop();
+              }
             },
           );
         },
@@ -611,6 +637,94 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                     ),
                                   ),
                                 ],
+
+                                // Social & Web3 Auth Section
+                                const SizedBox(height: 14),
+                                Row(
+                                  children: [
+                                    const Expanded(child: Divider(color: AppColors.borderSubtle)),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                      child: Text(
+                                        'OR CONNECT WITH',
+                                        style: AppTypography.labelSm.copyWith(
+                                          fontSize: 9,
+                                          color: AppColors.textSecondary,
+                                          letterSpacing: 0.6,
+                                        ),
+                                      ),
+                                    ),
+                                    const Expanded(child: Divider(color: AppColors.borderSubtle)),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+
+                                // Google & Apple Fast Sign-In
+                                SocialAuthButtons(
+                                  isLoading: authState.isSocialAuthLoading,
+                                  onGooglePressed: () => authNotifier.signInWithGoogle(),
+                                  onApplePressed: () => authNotifier.signInWithApple(),
+                                ),
+                                const SizedBox(height: 10),
+
+                                // Web3 DePIN Wallet Sign-In
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 44,
+                                  child: OutlinedButton(
+                                    onPressed: authState.isWeb3Connecting
+                                        ? null
+                                        : () => _showWeb3WalletModal(context),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(color: AppColors.secondary, width: 1.2),
+                                      shape: const RoundedRectangleBorder(borderRadius: AppTheme.radiusMd),
+                                      backgroundColor: AppColors.telemetryEmerald.withValues(alpha: 0.05),
+                                    ),
+                                    child: authState.isWeb3Connecting
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.secondary),
+                                          )
+                                        : Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Container(
+                                                width: 8,
+                                                height: 8,
+                                                decoration: const BoxDecoration(
+                                                  color: AppColors.telemetryEmerald,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Sign In with Web3 Wallet (DePIN)',
+                                                style: AppTypography.labelMd.copyWith(
+                                                  color: AppColors.secondary,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.telemetryEmerald.withValues(alpha: 0.2),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  '+4.2 NAV',
+                                                  style: AppTypography.labelSm.copyWith(
+                                                    fontSize: 10,
+                                                    color: AppColors.secondary,
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                  ),
+                                ),
                               ],
                             ),
                           ),

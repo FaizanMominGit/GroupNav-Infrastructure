@@ -6,7 +6,11 @@ import 'package:groupnav_mobile/features/auth/models/pilot_profile.dart';
 import 'package:groupnav_mobile/features/auth/providers/auth_provider.dart';
 import 'package:groupnav_mobile/features/auth/services/biometric_auth_service.dart';
 import 'package:groupnav_mobile/features/auth/services/cognito_auth_service.dart';
+import 'package:groupnav_mobile/features/auth/services/social_auth_service.dart';
+import 'package:groupnav_mobile/features/auth/services/web3_wallet_service.dart';
 import 'package:groupnav_mobile/features/auth/widgets/forgot_password_dialog.dart';
+import 'package:groupnav_mobile/features/auth/widgets/social_auth_buttons.dart';
+import 'package:groupnav_mobile/features/auth/widgets/web3_wallet_modal.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -377,6 +381,178 @@ void main() {
       expect(success, isFalse);
       expect(notifier.state.isAuthenticated, isFalse);
       expect(notifier.state.errorMessage, contains('not completed'));
+    });
+  });
+
+  group('Social Authentication Tests', () {
+    test('signInWithGoogle signs in and sets pilot profile', () async {
+      final storage = MemoryAuthStorage();
+      final authService = CognitoAuthService(config: dummyConfig, storage: storage);
+      final socialService = MockSocialAuthService();
+      final notifier = AuthNotifier(
+        authService,
+        socialAuthService: socialService,
+      );
+
+      final success = await notifier.signInWithGoogle();
+      expect(success, isTrue);
+      expect(notifier.state.isAuthenticated, isTrue);
+      expect(notifier.state.pilot?.phoneOrEmail, equals('maverick.google@groupnav.io'));
+      expect(notifier.state.pilot?.callsign, equals('Maverick'));
+      expect(notifier.state.pilot?.authProviderType, equals('google'));
+    });
+
+    test('signInWithGoogle records errorMessage on error', () async {
+      final storage = MemoryAuthStorage();
+      final authService = CognitoAuthService(config: dummyConfig, storage: storage);
+      final socialService = MockSocialAuthService()
+        ..shouldFail = true
+        ..failureMessage = 'OAuth pop-up closed';
+      final notifier = AuthNotifier(
+        authService,
+        socialAuthService: socialService,
+      );
+
+      final success = await notifier.signInWithGoogle();
+      expect(success, isFalse);
+      expect(notifier.state.isAuthenticated, isFalse);
+      expect(notifier.state.errorMessage, contains('OAuth pop-up closed'));
+    });
+
+    test('signInWithApple signs in and sets pilot profile', () async {
+      final storage = MemoryAuthStorage();
+      final authService = CognitoAuthService(config: dummyConfig, storage: storage);
+      final socialService = MockSocialAuthService();
+      final notifier = AuthNotifier(
+        authService,
+        socialAuthService: socialService,
+      );
+
+      final success = await notifier.signInWithApple();
+      expect(success, isTrue);
+      expect(notifier.state.isAuthenticated, isTrue);
+      expect(notifier.state.pilot?.phoneOrEmail, equals('ghost.apple@groupnav.io'));
+      expect(notifier.state.pilot?.callsign, equals('GhostRider'));
+      expect(notifier.state.pilot?.authProviderType, equals('apple'));
+    });
+  });
+
+  group('Web3 Wallet & DePIN Telemetry Tests', () {
+    test('signInWithWeb3 successfully connects wallet and populates profile with NAV balance', () async {
+      final storage = MemoryAuthStorage();
+      final authService = CognitoAuthService(config: dummyConfig, storage: storage);
+      final web3Service = MockWeb3WalletService();
+      final notifier = AuthNotifier(
+        authService,
+        web3WalletService: web3Service,
+      );
+
+      final success = await notifier.signInWithWeb3(Web3WalletType.metamask, chain: Web3Chain.polygon);
+      expect(success, isTrue);
+      expect(notifier.state.isAuthenticated, isTrue);
+      expect(notifier.state.pilot?.isWalletConnected, isTrue);
+      expect(notifier.state.pilot?.walletAddress, startsWith('0x'));
+      expect(notifier.state.pilot?.navTokenBalance, equals(24.5));
+      expect(notifier.state.connectedWallet?.walletType, equals(Web3WalletType.metamask));
+    });
+
+    test('signInWithWeb3 handles connection rejection', () async {
+      final storage = MemoryAuthStorage();
+      final authService = CognitoAuthService(config: dummyConfig, storage: storage);
+      final web3Service = MockWeb3WalletService()
+        ..shouldFail = true
+        ..failureMessage = 'User rejected';
+      final notifier = AuthNotifier(
+        authService,
+        web3WalletService: web3Service,
+      );
+
+      final success = await notifier.signInWithWeb3(Web3WalletType.phantom);
+      expect(success, isFalse);
+      expect(notifier.state.isAuthenticated, isFalse);
+      expect(notifier.state.errorMessage, contains('User rejected'));
+    });
+
+    test('linkWeb3Wallet links wallet to existing pilot and updates NAV balance', () async {
+      final storage = MemoryAuthStorage();
+      final authService = CognitoAuthService(config: dummyConfig, storage: storage);
+      final web3Service = MockWeb3WalletService();
+      final notifier = AuthNotifier(
+        authService,
+        web3WalletService: web3Service,
+      );
+
+      notifier.skipAuth();
+      expect(notifier.state.pilot?.walletAddress, isNull);
+
+      final success = await notifier.linkWeb3Wallet(Web3WalletType.metamask);
+      expect(success, isTrue);
+      expect(notifier.state.pilot?.isWalletConnected, isTrue);
+      expect(notifier.state.pilot?.walletAddress, startsWith('0x'));
+      expect(notifier.state.pilot?.navTokenBalance, equals(24.5));
+
+      await notifier.disconnectWeb3Wallet();
+      expect(notifier.state.pilot?.isWalletConnected, isFalse);
+      expect(notifier.state.connectedWallet, isNull);
+    });
+  });
+
+  group('Social & Web3 Widget Tests', () {
+    testWidgets('SocialAuthButtons renders Google and Apple buttons and fires callbacks', (tester) async {
+      bool googlePressed = false;
+      bool applePressed = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SocialAuthButtons(
+              onGooglePressed: () => googlePressed = true,
+              onApplePressed: () => applePressed = true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Google'), findsOneWidget);
+      expect(find.text('Apple'), findsOneWidget);
+
+      await tester.tap(find.text('Google'));
+      await tester.pump();
+      expect(googlePressed, isTrue);
+
+      await tester.tap(find.text('Apple'));
+      await tester.pump();
+      expect(applePressed, isTrue);
+    });
+
+    testWidgets('Web3WalletModal renders wallet options and fires onConnect', (tester) async {
+      Web3WalletType? connectedWallet;
+      Web3Chain? connectedChain;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Web3WalletModal(
+              onConnect: (wallet, chain) {
+                connectedWallet = wallet;
+                connectedChain = chain;
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Connect Web3 Wallet'), findsOneWidget);
+      expect(find.text('MetaMask'), findsOneWidget);
+      expect(find.text('Phantom'), findsOneWidget);
+      expect(find.text('WalletConnect'), findsOneWidget);
+      expect(find.textContaining('4.2 NAV/hr'), findsOneWidget);
+
+      await tester.tap(find.textContaining('Sign In with'));
+      await tester.pump();
+
+      expect(connectedWallet, equals(Web3WalletType.metamask));
+      expect(connectedChain, equals(Web3Chain.polygon));
     });
   });
 }

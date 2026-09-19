@@ -17,9 +17,9 @@ Current status indicator:
 - [x] **Callsign & Pilot Identity**: Rider handles/callsigns (e.g. `GhostRider`, `Maverick`) linked to session state.
 - [x] **Password Reset & Recovery**: "Forgot Password" flow with email OTP and new password submission.
 - [x] **Biometric Unlock**: Face ID and Fingerprint authentication for fast, one-touch login with motorcycle gear.
-- [ ] **Social & Web3 Auth**:
-  - Sign in with Google / Apple for one-tap sign-in.
-  - Web3 Wallet Connect (MetaMask, Phantom, WalletConnect) for DePIN telemetry proof-of-ride rewards.
+- [x] **Social & Web3 Auth**:
+  - [x] Sign in with Google / Apple for one-tap sign-in.
+  - [x] Web3 Wallet Connect (MetaMask, Phantom, WalletConnect) for DePIN telemetry proof-of-ride rewards.
 - [ ] **Session & Token Refresh Management**: Automatic silent renewal of Cognito ID, Access, and Refresh tokens with offline fallback.
 - [ ] **Account Deletion & GDPR Data Purge**: In-app self-service account deletion and personal trip wipe.
 

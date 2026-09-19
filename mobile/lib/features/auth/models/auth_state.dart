@@ -1,4 +1,5 @@
 import 'pilot_profile.dart';
+import '../services/web3_wallet_service.dart';
 
 enum AuthStatus {
   initial,
@@ -23,6 +24,9 @@ class AuthState {
   final bool isBiometricEnabled;
   final bool isBiometricLoading;
   final String biometricTypeLabel;
+  final bool isSocialAuthLoading;
+  final bool isWeb3Connecting;
+  final Web3ConnectionResult? connectedWallet;
 
   const AuthState({
     this.status = AuthStatus.initial,
@@ -39,6 +43,9 @@ class AuthState {
     this.isBiometricEnabled = false,
     this.isBiometricLoading = false,
     this.biometricTypeLabel = 'Biometrics',
+    this.isSocialAuthLoading = false,
+    this.isWeb3Connecting = false,
+    this.connectedWallet,
   });
 
   bool get isAuthenticated => status == AuthStatus.authenticated && pilot != null;
@@ -60,6 +67,9 @@ class AuthState {
     bool? isBiometricEnabled,
     bool? isBiometricLoading,
     String? biometricTypeLabel,
+    bool? isSocialAuthLoading,
+    bool? isWeb3Connecting,
+    Web3ConnectionResult? connectedWallet,
   }) {
     return AuthState(
       status: status ?? this.status,
@@ -76,6 +86,9 @@ class AuthState {
       isBiometricEnabled: isBiometricEnabled ?? this.isBiometricEnabled,
       isBiometricLoading: isBiometricLoading ?? this.isBiometricLoading,
       biometricTypeLabel: biometricTypeLabel ?? this.biometricTypeLabel,
+      isSocialAuthLoading: isSocialAuthLoading ?? this.isSocialAuthLoading,
+      isWeb3Connecting: isWeb3Connecting ?? this.isWeb3Connecting,
+      connectedWallet: connectedWallet ?? this.connectedWallet,
     );
   }
 
@@ -95,6 +108,31 @@ class AuthState {
       isBiometricEnabled: isBiometricEnabled,
       isBiometricLoading: isBiometricLoading,
       biometricTypeLabel: biometricTypeLabel,
+      isSocialAuthLoading: isSocialAuthLoading,
+      isWeb3Connecting: isWeb3Connecting,
+      connectedWallet: connectedWallet,
+    );
+  }
+
+  AuthState clearConnectedWallet() {
+    return AuthState(
+      status: status,
+      pilot: pilot?.copyWith(walletAddress: '', navTokenBalance: 0.0),
+      session: session,
+      errorMessage: errorMessage,
+      resendCountdown: resendCountdown,
+      awsCredentials: awsCredentials,
+      passwordResetDestination: passwordResetDestination,
+      isPasswordResetLoading: isPasswordResetLoading,
+      passwordResetError: passwordResetError,
+      passwordResetSuccess: passwordResetSuccess,
+      canUseBiometrics: canUseBiometrics,
+      isBiometricEnabled: isBiometricEnabled,
+      isBiometricLoading: isBiometricLoading,
+      biometricTypeLabel: biometricTypeLabel,
+      isSocialAuthLoading: isSocialAuthLoading,
+      isWeb3Connecting: isWeb3Connecting,
+      connectedWallet: null,
     );
   }
 }

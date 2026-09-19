@@ -57,10 +57,23 @@ class IotTelemetryService {
   }
 
   void updateRiderIdentity({required String riderId, required String callsign, bool? isLeader}) {
+    if (_currentRiderId.isNotEmpty && _currentRiderId != riderId) {
+      _activePeers.remove(_currentRiderId);
+    }
+    _activePeers.remove('self');
     _currentRiderId = riderId;
     _currentCallsign = callsign;
     if (isLeader != null) {
       _isLeader = isLeader;
+    }
+    if (_activePeers.containsKey(riderId)) {
+      final existing = _activePeers[riderId]!;
+      _activePeers[riderId] = existing.copyWith(
+        callsign: '$callsign (You)',
+        isLeader: _isLeader,
+        monikerTag: _isLeader ? 'Lead' : 'Rider',
+      );
+      _emitPeers();
     }
   }
 

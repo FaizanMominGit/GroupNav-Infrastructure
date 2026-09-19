@@ -202,35 +202,34 @@ class RadarHudSheet extends StatelessWidget {
                     ),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLow,
-                    borderRadius: AppTheme.radiusFull,
-                    border: Border.all(color: AppColors.borderSubtle),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        state.isAwsConnected ? Icons.cloud_done : Icons.cloud_off,
-                        size: 11,
-                        color: state.isAwsConnected ? AppColors.telemetryEmerald : AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        state.isAwsConnected
-                            ? 'IoT MQTT • ${state.broadcastCount} pkts'
-                            : 'Hardware GPS Fix',
-                        style: AppTypography.labelSm.copyWith(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textSecondary,
+                if (state.isAwsConnected)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: AppTheme.radiusFull,
+                      border: Border.all(color: AppColors.borderSubtle),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.cloud_done,
+                          size: 11,
+                          color: AppColors.telemetryEmerald,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Text(
+                          'IoT MQTT • ${state.broadcastCount} pkts',
+                          style: AppTypography.labelSm.copyWith(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -378,12 +377,17 @@ class RadarHudSheet extends StatelessWidget {
                           ),
                         ],
                       ),
-                      Text(
-                        '${state.peers.length + 1} Riders',
-                        style: AppTypography.labelSm.copyWith(
-                          fontSize: 9,
-                          color: AppColors.textSecondary,
-                        ),
+                      Builder(
+                        builder: (context) {
+                          final riderCount = state.peers.isEmpty ? 1 : state.peers.length;
+                          return Text(
+                            '$riderCount ${riderCount == 1 ? 'Rider' : 'Riders'}',
+                            style: AppTypography.labelSm.copyWith(
+                              fontSize: 9,
+                              color: AppColors.textSecondary,
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

@@ -495,7 +495,9 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            isLeader ? 'CHANGE' : '${radarState.peers.length + 1} Live',
+                            isLeader
+                                ? 'CHANGE'
+                                : '${radarState.peers.isEmpty ? 1 : radarState.peers.length} Live',
                             style: AppTypography.labelSm.copyWith(
                               color: isLeader ? AppColors.primary : AppColors.textPrimary,
                               fontWeight: FontWeight.w700,

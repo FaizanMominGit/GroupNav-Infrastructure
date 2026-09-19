@@ -3,6 +3,8 @@ import 'package:groupnav_mobile/features/settings/models/rider_settings.dart';
 import 'package:groupnav_mobile/features/settings/providers/settings_provider.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('GpsRate Enum Tests', () {
     test('Labels and shortLabels map correctly', () {
       expect(GpsRate.oneHz.label, '1 Hz (Battery Saver)');

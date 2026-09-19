@@ -24,6 +24,7 @@ class ProfileIdentityCard extends StatelessWidget {
     required ValueChanged<String> onSave,
   }) {
     final controller = TextEditingController(text: initialValue);
+    final isContact = title.toLowerCase().contains('contact');
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -33,7 +34,9 @@ class ProfileIdentityCard extends StatelessWidget {
         content: TextField(
           controller: controller,
           autofocus: true,
+          keyboardType: isContact ? TextInputType.phone : TextInputType.text,
           decoration: InputDecoration(
+            hintText: isContact ? 'e.g. +91 98765 43210' : null,
             filled: true,
             fillColor: AppColors.surfaceContainerLow,
             border: OutlineInputBorder(
@@ -184,7 +187,8 @@ class ProfileIdentityCard extends StatelessWidget {
             context: context,
             label: 'EMERGENCY CONTACT',
             value: settings.emergencyContact,
-            actionText: 'Update',
+            placeholder: 'Not configured (Tap to add phone)',
+            actionText: settings.emergencyContact.isNotEmpty ? 'Edit' : 'Add',
             onTapAction: () => _showEditDialog(
               context: context,
               title: 'Update Emergency Contact',
@@ -203,7 +207,11 @@ class ProfileIdentityCard extends StatelessWidget {
     required String value,
     required String actionText,
     required VoidCallback onTapAction,
+    String? placeholder,
   }) {
+    final bool isEmpty = value.trim().isEmpty;
+    final String displayText = isEmpty ? (placeholder ?? 'Not configured') : value;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -227,10 +235,12 @@ class ProfileIdentityCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  value,
+                  displayText,
                   style: AppTypography.labelLg.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    fontWeight: isEmpty ? FontWeight.w400 : FontWeight.w600,
+                    color: isEmpty ? AppColors.textSecondary : AppColors.textPrimary,
+                    fontStyle: isEmpty ? FontStyle.italic : FontStyle.normal,
+                    fontSize: isEmpty ? 13 : 14,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),

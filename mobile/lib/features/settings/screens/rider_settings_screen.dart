@@ -27,6 +27,9 @@ class RiderSettingsScreen extends ConsumerWidget {
     final packFormation = ref.watch(packNotifierProvider);
     final packNotifier = ref.read(packNotifierProvider.notifier);
 
+    final activeCallsign = (authState.pilot?.callsign != null && authState.pilot!.callsign.isNotEmpty)
+        ? authState.pilot!.callsign
+        : (settings.callsign.isNotEmpty ? settings.callsign : 'Pilot');
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -108,7 +111,7 @@ class RiderSettingsScreen extends ConsumerWidget {
                               ),
                             ),
                             Text(
-                              settings.callsign,
+                              activeCallsign,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: AppTypography.labelMd.copyWith(
@@ -130,8 +133,8 @@ class RiderSettingsScreen extends ConsumerWidget {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            (authState.pilot?.callsign ?? settings.callsign).length >= 2
-                                ? (authState.pilot?.callsign ?? settings.callsign).substring(0, 2).toUpperCase()
+                            activeCallsign.length >= 2
+                                ? activeCallsign.substring(0, 2).toUpperCase()
                                 : 'ME',
                             style: AppTypography.labelSm.copyWith(
                               color: AppColors.primary,
@@ -155,8 +158,10 @@ class RiderSettingsScreen extends ConsumerWidget {
                   // Section 1: Profile & Identity
                   ProfileIdentityCard(
                     settings: settings.copyWith(
-                      callsign: authState.pilot?.callsign ?? settings.callsign,
-                      vehicle: authState.pilot?.vehicleClass ?? settings.vehicle,
+                      callsign: activeCallsign,
+                      vehicle: (authState.pilot?.vehicleClass != null && authState.pilot!.vehicleClass.isNotEmpty)
+                          ? authState.pilot!.vehicleClass
+                          : settings.vehicle,
                     ),
                     onUpdateCallsign: (newCallsign) async {
                       settingsNotifier.setCallsign(newCallsign);

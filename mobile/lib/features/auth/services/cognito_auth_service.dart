@@ -46,6 +46,7 @@ class CognitoAuthService {
   static const String _keyCredentials = 'groupnav_aws_credentials';
   static const String _keyIdToken = 'groupnav_id_token';
   static const String _keyAccessToken = 'groupnav_access_token';
+  static const String _keyBiometricEnabled = 'groupnav_biometric_enabled';
 
   CognitoAuthService({
     required this.config,
@@ -366,6 +367,24 @@ class CognitoAuthService {
     await secureStorage.delete(key: _keyCredentials);
     await secureStorage.delete(key: _keyIdToken);
     await secureStorage.delete(key: _keyAccessToken);
+  }
+
+  /// Check whether biometric quick login is enabled by pilot
+  Future<bool> isBiometricEnabled() async {
+    final val = await secureStorage.read(key: _keyBiometricEnabled);
+    return val == 'true';
+  }
+
+  /// Update biometric login preference
+  Future<void> setBiometricEnabled(bool enabled) async {
+    await secureStorage.write(key: _keyBiometricEnabled, value: enabled ? 'true' : 'false');
+  }
+
+  /// Check whether a valid pilot profile and AWS credentials exist in secure keystore
+  Future<bool> hasSavedSession() async {
+    final rawPilot = await secureStorage.read(key: _keyPilot);
+    final rawCreds = await secureStorage.read(key: _keyCredentials);
+    return rawPilot != null && rawCreds != null;
   }
 
   Map<String, dynamic> _decodeJwtPayload(String token) {

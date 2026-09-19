@@ -4,6 +4,7 @@ import 'package:groupnav_mobile/core/config/client_config.dart';
 import 'package:groupnav_mobile/features/auth/models/auth_state.dart';
 import 'package:groupnav_mobile/features/auth/models/pilot_profile.dart';
 import 'package:groupnav_mobile/features/auth/providers/auth_provider.dart';
+import 'package:groupnav_mobile/features/auth/services/biometric_auth_service.dart';
 import 'package:groupnav_mobile/features/auth/services/cognito_auth_service.dart';
 import 'package:groupnav_mobile/features/auth/widgets/forgot_password_dialog.dart';
 
@@ -303,6 +304,79 @@ void main() {
       expect(successInvoked, isTrue);
       expect(updatedEmail, equals('pilot@groupnav.io'));
       expect(updatedPass, equals('SecurePass123!'));
+    });
+  });
+
+  group('Biometric Unlock Unit & Flow Tests', () {
+    test('MockBiometricService reports capabilities accurately', () async {
+      final bio = MockBiometricService(mockTypes: ['Fingerprint', 'Face ID']);
+      expect(await bio.canAuthenticate(), isTrue);
+      expect(await bio.getAvailableBiometrics(), equals(['Fingerprint', 'Face ID']));
+      expect(await bio.getPrimaryBiometricLabel(), equals('Fingerprint'));
+
+      final authenticated = await bio.authenticate(localizedReason: 'Test');
+      expect(authenticated, isTrue);
+      expect(bio.authenticateCalled, isTrue);
+    });
+
+    test('checkBiometricAvailability sets canUseBiometrics when session exists and enabled', () async {
+      final storage = MemoryAuthStorage();
+      final authService = CognitoAuthService(config: dummyConfig, storage: storage);
+      final bioService = MockBiometricService();
+      final notifier = AuthNotifier(authService, biometricService: bioService);
+
+      // Initially no session -> canUseBiometrics is false
+      await notifier.checkBiometricAvailability();
+      expect(notifier.state.canUseBiometrics, isFalse);
+
+      // Seed valid session and enable biometrics
+      await storage.write(
+        key: 'groupnav_pilot_profile',
+        value: '{"callsign":"Apex","phoneOrEmail":"pilot@groupnav.io","vehicleClass":"sportbike","beaconColor":"#0066FF","cognitoIdentityId":"id-123","cognitoSub":"sub-123"}',
+      );
+      await storage.write(
+        key: 'groupnav_aws_credentials',
+        value: '{"AccessKeyId":"AKIA...","SecretKey":"secret","SessionToken":"token"}',
+      );
+      await notifier.toggleBiometricLogin(true);
+
+      expect(notifier.state.isBiometricEnabled, isTrue);
+      expect(notifier.state.canUseBiometrics, isTrue);
+      expect(notifier.state.biometricTypeLabel, equals('Fingerprint'));
+    });
+
+    test('unlockWithBiometrics succeeds and restores session', () async {
+      final storage = MemoryAuthStorage();
+      await storage.write(
+        key: 'groupnav_pilot_profile',
+        value: '{"callsign":"Apex","phoneOrEmail":"pilot@groupnav.io","vehicleClass":"sportbike","beaconColor":"#0066FF","cognitoIdentityId":"id-123","cognitoSub":"sub-123"}',
+      );
+      await storage.write(
+        key: 'groupnav_aws_credentials',
+        value: '{"AccessKeyId":"AKIA...","SecretKey":"secret","SessionToken":"token"}',
+      );
+
+      final authService = CognitoAuthService(config: dummyConfig, storage: storage);
+      final bioService = MockBiometricService(shouldSucceed: true);
+      final notifier = AuthNotifier(authService, biometricService: bioService);
+
+      final success = await notifier.unlockWithBiometrics();
+      expect(success, isTrue);
+      expect(notifier.state.isAuthenticated, isTrue);
+      expect(notifier.state.pilot?.callsign, equals('Apex'));
+      expect(notifier.state.awsCredentials?['AccessKeyId'], equals('AKIA...'));
+    });
+
+    test('unlockWithBiometrics fails gracefully when user cancels or biometric fails', () async {
+      final storage = MemoryAuthStorage();
+      final authService = CognitoAuthService(config: dummyConfig, storage: storage);
+      final bioService = MockBiometricService(shouldSucceed: false);
+      final notifier = AuthNotifier(authService, biometricService: bioService);
+
+      final success = await notifier.unlockWithBiometrics();
+      expect(success, isFalse);
+      expect(notifier.state.isAuthenticated, isFalse);
+      expect(notifier.state.errorMessage, contains('not completed'));
     });
   });
 }

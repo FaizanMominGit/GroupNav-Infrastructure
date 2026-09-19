@@ -502,6 +502,115 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                           ),
                                   ),
                                 ),
+
+                                // Quick Biometric Unlock (Face ID / Fingerprint)
+                                if (!authNotifier.isSignUpMode && authState.canUseBiometrics) ...[
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      const Expanded(child: Divider(color: AppColors.borderSubtle)),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                                        child: Text(
+                                          'OR BIOMETRIC UNLOCK',
+                                          style: AppTypography.labelSm.copyWith(
+                                            fontSize: 9,
+                                            color: AppColors.textSecondary,
+                                            letterSpacing: 0.6,
+                                          ),
+                                        ),
+                                      ),
+                                      const Expanded(child: Divider(color: AppColors.borderSubtle)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 48,
+                                    child: OutlinedButton(
+                                      onPressed: authState.isBiometricLoading
+                                          ? null
+                                          : () => authNotifier.unlockWithBiometrics(),
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(color: AppColors.primary, width: 1.5),
+                                        shape: const RoundedRectangleBorder(borderRadius: AppTheme.radiusMd),
+                                        backgroundColor: AppColors.primary.withValues(alpha: 0.05),
+                                      ),
+                                      child: authState.isBiometricLoading
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                                            )
+                                          : Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  authState.biometricTypeLabel.contains('Face')
+                                                      ? Icons.face
+                                                      : Icons.fingerprint,
+                                                  color: AppColors.primary,
+                                                  size: 22,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'Unlock with ${authState.biometricTypeLabel}',
+                                                  style: AppTypography.labelLg.copyWith(
+                                                    color: AppColors.primary,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                    ),
+                                  ),
+                                ],
+
+                                // Biometric Login Preference Switch
+                                if (!authNotifier.isSignUpMode) ...[
+                                  const SizedBox(height: 10),
+                                  InkWell(
+                                    onTap: () {
+                                      authNotifier.toggleBiometricLogin(!authState.isBiometricEnabled);
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 4),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.fingerprint,
+                                                size: 16,
+                                                color: authState.isBiometricEnabled
+                                                    ? AppColors.primary
+                                                    : AppColors.textSecondary,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'One-Touch Biometric Login',
+                                                style: AppTypography.labelSm.copyWith(
+                                                  color: AppColors.textSecondary,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Switch(
+                                            value: authState.isBiometricEnabled,
+                                            activeColor: AppColors.primary,
+                                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            onChanged: (val) {
+                                              authNotifier.toggleBiometricLogin(val);
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),

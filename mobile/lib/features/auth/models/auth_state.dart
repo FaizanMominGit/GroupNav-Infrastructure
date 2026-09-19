@@ -19,6 +19,10 @@ class AuthState {
   final bool isPasswordResetLoading;
   final String? passwordResetError;
   final bool passwordResetSuccess;
+  final bool canUseBiometrics;
+  final bool isBiometricEnabled;
+  final bool isBiometricLoading;
+  final String biometricTypeLabel;
 
   const AuthState({
     this.status = AuthStatus.initial,
@@ -31,6 +35,10 @@ class AuthState {
     this.isPasswordResetLoading = false,
     this.passwordResetError,
     this.passwordResetSuccess = false,
+    this.canUseBiometrics = false,
+    this.isBiometricEnabled = false,
+    this.isBiometricLoading = false,
+    this.biometricTypeLabel = 'Biometrics',
   });
 
   bool get isAuthenticated => status == AuthStatus.authenticated && pilot != null;
@@ -48,6 +56,10 @@ class AuthState {
     bool? isPasswordResetLoading,
     String? passwordResetError,
     bool? passwordResetSuccess,
+    bool? canUseBiometrics,
+    bool? isBiometricEnabled,
+    bool? isBiometricLoading,
+    String? biometricTypeLabel,
   }) {
     return AuthState(
       status: status ?? this.status,
@@ -60,6 +72,10 @@ class AuthState {
       isPasswordResetLoading: isPasswordResetLoading ?? this.isPasswordResetLoading,
       passwordResetError: passwordResetError ?? this.passwordResetError,
       passwordResetSuccess: passwordResetSuccess ?? this.passwordResetSuccess,
+      canUseBiometrics: canUseBiometrics ?? this.canUseBiometrics,
+      isBiometricEnabled: isBiometricEnabled ?? this.isBiometricEnabled,
+      isBiometricLoading: isBiometricLoading ?? this.isBiometricLoading,
+      biometricTypeLabel: biometricTypeLabel ?? this.biometricTypeLabel,
     );
   }
 
@@ -75,6 +91,10 @@ class AuthState {
       isPasswordResetLoading: false,
       passwordResetError: null,
       passwordResetSuccess: false,
+      canUseBiometrics: canUseBiometrics,
+      isBiometricEnabled: isBiometricEnabled,
+      isBiometricLoading: isBiometricLoading,
+      biometricTypeLabel: biometricTypeLabel,
     );
   }
 }

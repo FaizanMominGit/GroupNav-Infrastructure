@@ -16,7 +16,7 @@ Current status indicator:
 - [x] **Guest / Skip / Offline Ride Mode**: Allow riders to enter the app and ride immediately in solo mode without requiring an active account.
 - [x] **Callsign & Pilot Identity**: Rider handles/callsigns (e.g. `GhostRider`, `Maverick`) linked to session state.
 - [x] **Password Reset & Recovery**: "Forgot Password" flow with email OTP and new password submission.
-- [ ] **Biometric Unlock**: Face ID and Fingerprint authentication for fast, one-touch login with motorcycle gear.
+- [x] **Biometric Unlock**: Face ID and Fingerprint authentication for fast, one-touch login with motorcycle gear.
 - [ ] **Social & Web3 Auth**:
   - Sign in with Google / Apple for one-tap sign-in.
   - Web3 Wallet Connect (MetaMask, Phantom, WalletConnect) for DePIN telemetry proof-of-ride rewards.

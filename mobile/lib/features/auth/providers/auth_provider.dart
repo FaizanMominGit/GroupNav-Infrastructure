@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/config/client_config.dart';
 import '../models/auth_state.dart';
 import '../models/pilot_profile.dart';
+import '../services/biometric_auth_service.dart';
 import '../services/cognito_auth_service.dart';
 
 final clientConfigProvider = Provider<ClientConfig>((ref) {
@@ -14,13 +15,19 @@ final cognitoAuthServiceProvider = Provider<CognitoAuthService>((ref) {
   return CognitoAuthService(config: config);
 });
 
+final biometricServiceProvider = Provider<IBiometricService>((ref) {
+  return LocalBiometricService();
+});
+
 final authNotifierProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final authService = ref.watch(cognitoAuthServiceProvider);
-  return AuthNotifier(authService);
+  final biometricService = ref.watch(biometricServiceProvider);
+  return AuthNotifier(authService, biometricService: biometricService);
 });
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final CognitoAuthService _authService;
+  final IBiometricService _biometricService;
   Timer? _countdownTimer;
 
   String _email = '';
@@ -30,8 +37,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   String _selectedBeaconColor = '#0066FF';
   bool _isSignUpMode = false;
 
-  AuthNotifier(this._authService) : super(const AuthState()) {
+  AuthNotifier(this._authService, {IBiometricService? biometricService})
+      : _biometricService = biometricService ?? LocalBiometricService(),
+        super(const AuthState()) {
     checkSavedSession();
+    checkBiometricAvailability();
   }
 
   String get email => _email;
@@ -80,6 +90,72 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
       }
     } catch (_) {}
+  }
+
+  /// Check whether biometric authentication can be offered on device
+  Future<void> checkBiometricAvailability() async {
+    try {
+      final canAuth = await _biometricService.canAuthenticate();
+      final label = await _biometricService.getPrimaryBiometricLabel();
+      final hasSavedSession = await _authService.hasSavedSession();
+      final isEnabled = await _authService.isBiometricEnabled();
+
+      state = state.copyWith(
+        canUseBiometrics: canAuth && hasSavedSession && isEnabled,
+        isBiometricEnabled: isEnabled,
+        biometricTypeLabel: label,
+      );
+    } catch (_) {}
+  }
+
+  /// Authenticate using device biometrics and restore the authenticated Cognito session
+  Future<bool> unlockWithBiometrics() async {
+    state = state.copyWith(isBiometricLoading: true, errorMessage: null);
+
+    try {
+      final authenticated = await _biometricService.authenticate(
+        localizedReason: 'Authenticate with ${state.biometricTypeLabel} to unlock your GroupNav convoy session',
+      );
+
+      if (!authenticated) {
+        state = state.copyWith(
+          isBiometricLoading: false,
+          errorMessage: 'Biometric authentication was not completed.',
+        );
+        return false;
+      }
+
+      final savedPilot = await _authService.restoreSession();
+      if (savedPilot != null) {
+        final creds = await _authService.getCachedCredentials();
+        state = state.copyWith(
+          status: AuthStatus.authenticated,
+          pilot: savedPilot,
+          awsCredentials: creds,
+          isBiometricLoading: false,
+          errorMessage: null,
+        );
+        return true;
+      } else {
+        state = state.copyWith(
+          isBiometricLoading: false,
+          errorMessage: 'No stored credentials found. Please sign in with password.',
+        );
+        return false;
+      }
+    } catch (e) {
+      state = state.copyWith(
+        isBiometricLoading: false,
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      );
+      return false;
+    }
+  }
+
+  /// Toggle biometric unlock preference and update state
+  Future<void> toggleBiometricLogin(bool enabled) async {
+    await _authService.setBiometricEnabled(enabled);
+    await checkBiometricAvailability();
   }
 
   /// Sign up with AWS Cognito User Pool

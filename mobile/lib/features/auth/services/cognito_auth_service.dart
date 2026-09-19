@@ -252,7 +252,9 @@ class CognitoAuthService {
     // Decode ID token to extract user attributes
     final tokenClaims = _decodeJwtPayload(idToken);
     final userSub = tokenClaims['sub'] as String? ?? '';
-    final resolvedCallsign = callsign ?? tokenClaims['name'] as String? ?? email.split('@').first;
+    final resolvedCallsign = (callsign != null && callsign.trim().isNotEmpty)
+        ? callsign.trim()
+        : (tokenClaims['name'] as String? ?? tokenClaims['cognito:username'] as String? ?? email.split('@').first);
 
     // Exchange Cognito ID Token for real AWS temporary IAM credentials from Cognito Identity Pool
     final identityEndpoint = Uri.parse('https://cognito-identity.${config.region}.amazonaws.com/');
@@ -367,6 +369,45 @@ class CognitoAuthService {
     await secureStorage.delete(key: _keyCredentials);
     await secureStorage.delete(key: _keyIdToken);
     await secureStorage.delete(key: _keyAccessToken);
+  }
+
+  /// Update pilot callsign locally and in AWS Cognito User Pool
+  Future<void> updateCallsign(String newCallsign) async {
+    final rawPilot = await secureStorage.read(key: _keyPilot);
+    if (rawPilot != null) {
+      try {
+        final jsonMap = json.decode(rawPilot) as Map<String, dynamic>;
+        final pilot = PilotProfile.fromJson(jsonMap).copyWith(callsign: newCallsign);
+        await secureStorage.write(key: _keyPilot, value: json.encode(pilot.toJson()));
+      } catch (_) {}
+    }
+
+    // Attempt to update Cognito user attribute 'name' if accessToken is present
+    final accessToken = await secureStorage.read(key: _keyAccessToken);
+    if (accessToken != null && accessToken.isNotEmpty) {
+      try {
+        final endpoint = Uri.parse('https://cognito-idp.${config.region}.amazonaws.com/');
+        await http.post(
+          endpoint,
+          headers: {
+            'Content-Type': 'application/x-amz-json-1.1',
+            'X-Amz-Target': 'AWSCognitoIdentityProviderService.UpdateUserAttributes',
+          },
+          body: json.encode({
+            'AccessToken': accessToken,
+            'UserAttributes': [
+              {
+                'Name': 'name',
+                'Value': newCallsign,
+              },
+            ],
+          }),
+        ).timeout(const Duration(seconds: 10));
+        debugPrint('[CognitoAuthService] Updated Cognito user name attribute to $newCallsign on AWS.');
+      } catch (e) {
+        debugPrint('[CognitoAuthService] Cognito UpdateUserAttributes notice: $e');
+      }
+    }
   }
 
   /// Check whether biometric quick login is enabled by pilot

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:groupnav_mobile/core/config/client_config.dart';
 import 'package:groupnav_mobile/features/groups/models/pack_formation.dart';
 import 'package:groupnav_mobile/features/groups/models/pack_member.dart';
@@ -106,6 +107,7 @@ void main() {
     late PackNotifier packNotifier;
 
     setUp(() {
+      FlutterSecureStorage.setMockInitialValues({});
       telemetryService = IotTelemetryService(config: dummyConfig);
       radarNotifier = RadarNotifier(telemetryService);
       packNotifier = PackNotifier(radarNotifier);
@@ -165,7 +167,7 @@ void main() {
       expect(packNotifier.state.title, equals('Solo Ride Mode'));
       expect(packNotifier.state.isTelemetrySyncActive, isFalse);
       expect(packNotifier.state.members.length, equals(1));
-      expect(packNotifier.state.members.first.callsign, equals('Apex (You)'));
+      expect(packNotifier.state.members.first.callsign, equals('Pilot'));
     });
 
     test('joinPack sets isInPack to true and updates packCode', () async {

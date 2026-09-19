@@ -59,7 +59,7 @@ class CollapsedMiniMap extends StatelessWidget {
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    // Apex (Leader / You) - Center
+                    // Primary Rider (Self / Road Captain) - Center
                     Align(
                       alignment: Alignment.center,
                       child: Stack(
@@ -92,62 +92,37 @@ class CollapsedMiniMap extends StatelessWidget {
                       ),
                     ),
 
-                    // Viper (+140m ahead)
-                    Positioned(
-                      top: 10,
-                      right: 20,
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.telemetryEmerald,
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 2,
+                    // Dynamic Pack Members
+                    ...formation.members.where((m) => !m.isCurrentUser && !m.isLeader).toList().asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final member = entry.value;
+                      final isAhead = member.offsetMeters > 0;
+                      final top = (idx % 2 == 0) ? 14.0 : 50.0;
+                      final left = (idx % 2 == 0) ? 20.0 : 96.0;
+                      final color = isAhead ? AppColors.telemetryEmerald : AppColors.secondary;
+                      return Positioned(
+                        top: top,
+                        left: left,
+                        child: Tooltip(
+                          message: member.cleanCallsign,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: color,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.15),
+                                  blurRadius: 2,
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-
-                    // Ghost (-790m trailing warning near edge)
-                    Positioned(
-                      bottom: 12,
-                      left: 12,
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.alertWarning,
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 2,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Nomad (Lagging / Offline)
-                    Positioned(
-                      bottom: 6,
-                      right: 14,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.textSecondary,
-                          border: Border.all(color: Colors.white, width: 1.5),
-                        ),
-                      ),
-                    ),
+                      );
+                    }),
                   ],
                 ),
               ),

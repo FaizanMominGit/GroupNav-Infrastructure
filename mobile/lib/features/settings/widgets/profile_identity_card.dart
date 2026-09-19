@@ -8,10 +8,6 @@ class ProfileIdentityCard extends StatelessWidget {
   final ValueChanged<String> onUpdateCallsign;
   final ValueChanged<String> onUpdateVehicle;
   final ValueChanged<String> onUpdateEmergencyContact;
-  final String? walletAddress;
-  final double navBalance;
-  final VoidCallback? onConnectWallet;
-  final VoidCallback? onDisconnectWallet;
 
   const ProfileIdentityCard({
     super.key,
@@ -19,10 +15,6 @@ class ProfileIdentityCard extends StatelessWidget {
     required this.onUpdateCallsign,
     required this.onUpdateVehicle,
     required this.onUpdateEmergencyContact,
-    this.walletAddress,
-    this.navBalance = 0.0,
-    this.onConnectWallet,
-    this.onDisconnectWallet,
   });
 
   void _showEditDialog({
@@ -80,13 +72,6 @@ class ProfileIdentityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWalletLinked = walletAddress != null && walletAddress!.isNotEmpty;
-    final truncatedWallet = isWalletLinked
-        ? (walletAddress!.length > 10
-            ? '${walletAddress!.substring(0, 6)}...${walletAddress!.substring(walletAddress!.length - 4)}'
-            : walletAddress!)
-        : null;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -205,88 +190,6 @@ class ProfileIdentityCard extends StatelessWidget {
               title: 'Update Emergency Contact',
               initialValue: settings.emergencyContact,
               onSave: onUpdateEmergencyContact,
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // Item 4: Web3 DePIN Telemetry Wallet
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: isWalletLinked
-                  ? AppColors.telemetryEmerald.withValues(alpha: 0.05)
-                  : AppColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isWalletLinked
-                    ? AppColors.telemetryEmerald.withValues(alpha: 0.3)
-                    : AppColors.borderSubtle,
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'DEPIN TELEMETRY WALLET',
-                            style: AppTypography.labelSm.copyWith(
-                              color: AppColors.textSecondary,
-                              fontSize: 10,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          if (isWalletLinked) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: AppColors.telemetryEmerald.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '${navBalance.toStringAsFixed(1)} NAV',
-                                style: AppTypography.labelSm.copyWith(
-                                  fontSize: 9,
-                                  color: AppColors.secondary,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        isWalletLinked ? truncatedWallet! : 'Not linked (+4.2 NAV/hr available)',
-                        style: AppTypography.labelLg.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: isWalletLinked ? AppColors.secondary : AppColors.textSecondary,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: isWalletLinked ? onDisconnectWallet : onConnectWallet,
-                  borderRadius: BorderRadius.circular(6),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                    child: Text(
-                      isWalletLinked ? 'Disconnect' : 'Connect',
-                      style: AppTypography.labelSm.copyWith(
-                        color: isWalletLinked ? AppColors.alertCritical : AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
             ),
           ),
         ],

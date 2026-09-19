@@ -71,17 +71,17 @@ class HardwareLocationEngine implements ILocationEngine {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          debugPrint('[LocationService] Location permissions denied.');
+          debugPrint('[LocationService] Location permissions denied by user.');
           return false;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        debugPrint('[LocationService] Location permissions denied forever.');
+        debugPrint('[LocationService] Location permissions permanently denied.');
         return false;
       }
 
-      // Immediately emit last known position if available for instantaneous fix
+      // 1. Immediately emit last known position if available for instantaneous initial fix
       try {
         final lastPos = await Geolocator.getLastKnownPosition();
         if (lastPos != null) {
@@ -100,11 +100,35 @@ class HardwareLocationEngine implements ILocationEngine {
         }
       } catch (_) {}
 
+      // 2. Fetch fresh immediate position fix without waiting for user movement
+      try {
+        final currentPos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 4),
+        );
+        final speedKmh = (currentPos.speed.clamp(0.0, 300.0) * 3.6);
+        _controller.add(
+          PositionData(
+            latitude: currentPos.latitude,
+            longitude: currentPos.longitude,
+            altitude: currentPos.altitude,
+            speedKmh: speedKmh,
+            headingDeg: currentPos.heading,
+            accuracyMeters: currentPos.accuracy,
+            timestamp: currentPos.timestamp,
+          ),
+        );
+      } catch (e) {
+        debugPrint('[LocationService] Initial getCurrentPosition notice: $e');
+      }
+
+      // 3. Continuously stream real hardware GPS positions
       const locationSettings = LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 2, // 2 meters movement delta
+        distanceFilter: 1, // 1 meter movement delta for responsive tracking
       );
 
+      await _sub?.cancel();
       _sub = Geolocator.getPositionStream(locationSettings: locationSettings).listen(
         (Position pos) {
           final speedKmh = (pos.speed.clamp(0.0, 300.0) * 3.6);
@@ -213,6 +237,13 @@ class LocationService {
     return await Geolocator.requestPermission();
   }
 
+  Future<bool> retryHardwareGps() async {
+    if (_mode == LocationMode.hardware) {
+      return await _engine.initialize();
+    }
+    return false;
+  }
+
   Future<void> setMode(LocationMode newMode) async {
     if (_mode == newMode) return;
     _mode = newMode;
@@ -231,12 +262,10 @@ class LocationService {
   Future<void> _startCurrentEngine() async {
     final success = await _engine.initialize();
     if (!success && _mode == LocationMode.hardware) {
-      debugPrint('[LocationService] Hardware GPS unavailable, falling back to Simulation mode.');
-      _mode = LocationMode.simulation;
-      _engine = SimulationLocationEngine();
-      await _engine.initialize();
+      debugPrint('[LocationService] Hardware GPS waiting for permissions or location service to be enabled.');
     }
 
+    await _engineSub?.cancel();
     _engineSub = _engine.positionStream.listen((data) {
       _lastPosition = data;
       _unifiedController.add(data);

@@ -7,14 +7,12 @@ class ConvoyAlertsCard extends StatelessWidget {
   final RiderSettings settings;
   final ValueChanged<bool> onToggleGeofenceWarning;
   final ValueChanged<bool> onToggleSpeedAlert;
-  final ValueChanged<bool> onToggleVoiceAudioCues;
 
   const ConvoyAlertsCard({
     super.key,
     required this.settings,
     required this.onToggleGeofenceWarning,
     required this.onToggleSpeedAlert,
-    required this.onToggleVoiceAudioCues,
   });
 
   @override
@@ -45,7 +43,7 @@ class ConvoyAlertsCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            'Notifications and acoustic cues during group rides',
+            'Visual HUD notifications during group rides',
             style: AppTypography.bodySm.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -69,15 +67,6 @@ class ConvoyAlertsCard extends StatelessWidget {
             subtitle: 'Alert if leader accelerates over limit',
             value: settings.speedAlert,
             onChanged: onToggleSpeedAlert,
-          ),
-          const Divider(height: 16, color: AppColors.borderSubtle),
-
-          // Switch 3: Voice & Audio Cues
-          _buildToggleRow(
-            title: 'Voice & Audio Cues',
-            subtitle: 'Speak rider distance alerts in helmet headset',
-            value: settings.voiceAudioCues,
-            onChanged: onToggleVoiceAudioCues,
           ),
         ],
       ),

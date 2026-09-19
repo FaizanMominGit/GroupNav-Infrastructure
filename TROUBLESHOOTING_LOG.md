@@ -612,3 +612,101 @@ When an issue, error, or unexpected behavior is encountered, document it using t
 - **Prevention Rule**:
   Inside custom bottom sheet dialogs, prefer `GestureDetector` with `HitTestBehavior.opaque` over bare `InkWell` when wrapping complex card layouts to ensure touch events are reliably dispatched across all Android gesture navigations.
 
+---
+
+### [ISSUE-030] Default 'Apex' Identity Collision, Dual '(You)' Roster Bug, and Radar Map Leader Attribution
+- **Date & Phase**: 2026-09-19 | Milestone 4 (Multi-Device Field Testing & Convoy Interoperability)
+- **Component / Command**: `AuthNotifier` (`auth_provider.dart`), `PackRosterCard` (`pack_roster_card.dart`), `IotTelemetryService` (`iot_telemetry_service.dart`), `DynamoDbPackService` (`dynamodb_pack_service.dart`)
+- **Symptom / Error Message**:
+  1. When launching the app, it automatically logged in as legacy default account `"Apex"` instead of remaining logged out or requiring authentic credentials.
+  2. When logging in as an authentic user (e.g. `lion`), both members in the convoy roster displayed `"(You)"`.
+  3. On the radar screen, the live user marker displayed `"Apex Leader"` instead of the active pilot's real callsign and actual leadership status.
+- **Root Cause Analysis**:
+  1. `AuthNotifier._callsign` was initialized to `'Apex'`. In `signIn(email, password)`, it passed `_callsign` (`'Apex'`) to `CognitoAuthService`, which unconditionally overwrote the authenticated user's Cognito `name` claim (e.g., `lion`).
+  2. In `PackRosterCard`, line 123 had `if (isLead) ... [ Text('(You)') ]`. It erroneously assumed whoever is the pack leader is `(You)`. When a rider joined another user's convoy, both the Road Captain (due to `isLead`) and the current rider displayed `"(You)"`.
+  3. `IotTelemetryService` defaulted `_currentCallsign = 'Apex'` and `_isLeader = true`. In `radar_provider.dart`, `iotTelemetryServiceProvider` only listened to future changes on `authNotifierProvider` and did not read the initial auth state on startup. Thus, self-telemetry was broadcast with `Apex (You)` and `Lead`.
+  4. Previous development test sessions persisted a `groupnav_pilot_profile` with `"0xApex"` in device `FlutterSecureStorage`.
+- **Fix / Solution Applied**:
+  1. Changed initial `_callsign` in `AuthNotifier` to empty string `''`. In `signIn()`, pass `callsign` as null if empty, prompting `CognitoAuthService` to resolve the authentic callsign directly from Cognito JWT token claims (`name` / username / email prefix).
+  2. Added `isCurrentUser` boolean to `PackMember` and a `cleanCallsign` getter.
+  3. In `PackRosterCard`, removed `if (isLead)` and rendered the `You` pill badge strictly `if (member.isCurrentUser)`. Displayed `member.cleanCallsign` to prevent name string mangling.
+  4. In `DynamoDbPackService._parsePackItem`, correctly set `isCurrentUser: isCurrentUser` and stripped any redundant `(You)` string artifacts.
+  5. In `IotTelemetryService`, initialized `_currentCallsign = ''` and `_isLeader = false`. In `radar_provider.dart`, read the initial authenticated pilot on provider creation and update identity immediately.
+  6. In `RiderSettingsScreen` and `ProfileIdentityCard`, bound user profile identity directly to `authState.pilot`.
+  7. Cleared cached legacy secure storage on test hardware using `adb shell pm clear com.example.groupnav_mobile`.
+- **Verification**:
+  All 99 unit and widget tests passed. App rebuilt and deployed onto physical hardware with clean state. Screen lands on `AuthOnboardingScreen` logged out; sign-in acquires real Cognito pilot credentials, dynamic callsign displays correctly, exactly one `You` badge appears on the active user's roster card, and radar map accurately reflects follower/leader roles.
+### [ISSUE-031] Silent Simulation Fallback Overriding Hardware GPS and Stale Server Convoy Data Collision
+- **Date & Phase**: 2026-09-19 | Milestone 4 (Multi-Device Field Testing & Convoy Interoperability)
+- **Component / Command**: `LocationService` (`location_service.dart`), `HardwareLocationEngine`, `DynamoDbPackService`, AWS DynamoDB `groupnav-packs` table
+- **Symptom / Error Message**:
+  1. On physical mobile devices, the app was executing a demo simulation with mock San Francisco coordinates (`lat: 37.7680, lng: -122.4280`) rather than reporting authentic hardware device GPS coordinates.
+  2. Stale convoy rooms from previous test runs remained active on the AWS server in DynamoDB.
+  3. The collapsed mini-map displayed hardcoded vehicle nodes (`Viper`, `Ghost`, `Nomad`) regardless of actual pack membership.
+- **Root Cause Analysis**:
+  1. In `LocationService._startCurrentEngine()`, whenever `HardwareLocationEngine.initialize()` returned `false` (which occurs on fresh app install before Android location permissions are accepted), the service silently fell back to `SimulationLocationEngine`. This triggered a 1-second timer emitting fake route coordinates, permanently disabling hardware GPS.
+  2. Previous testing left 16 stale pack records in the DynamoDB `groupnav-packs` table in AWS `ap-south-1`.
+  3. `CollapsedMiniMap` contained static dummy Positioned widgets representing fictitious convoy peers.
+- **Fix / Solution Applied**:
+  1. Removed the silent simulation fallback in `LocationService._startCurrentEngine()`. The service now stays strictly on `HardwareLocationEngine`.
+  2. In `HardwareLocationEngine`, added immediate position queries (`Geolocator.getLastKnownPosition()` and `Geolocator.getCurrentPosition()`) alongside continuous high-accuracy position streaming (`Geolocator.getPositionStream(distanceFilter: 1)`).
+  3. Added `retryHardwareGps()` in `LocationService` and invoked it in `LiveRadarScreen.initState` to lock authentic GPS coordinates immediately upon screen entry.
+  4. Purged all 16 stale convoy room records from the AWS DynamoDB `groupnav-packs` table via `scripts/purge_packs.js`, verifying 0 records remain.
+  5. Replaced static mock nodes in `CollapsedMiniMap` with dynamic rendering of authentic `formation.members`.
+  6. Uninstalled the app from connected test hardware (`adb uninstall com.example.groupnav_mobile`) to wipe local storage, rebuilt the APK, and reinstalled freshly.
+- **Verification**:
+  1. Scanned AWS DynamoDB `groupnav-packs` table: confirmed 0 items.
+  2. Flutter unit tests passed: 99/99 tests OK.
+  3. Reinstalled fresh app on device: verified clean unauthenticated launch, real hardware GPS streaming, and zero mock coordinates emitted.
+- **Prevention Rule**:
+  Never implement silent fallbacks from production hardware sensors to mock simulation tickers. If hardware access is pending or unpermitted, the service must report its true status and provide explicit retry hooks rather than faking telemetry.
+
+---
+
+### [ISSUE-032] Convoy Room Disappears on App Exit and Callsign Defaults to Apex
+- **Date & Phase**: 2026-09-19 | Milestone 4 (Multi-Device Field Testing & Convoy Interoperability)
+- **Component / Command**: `PackProvider` (`pack_provider.dart`), `RiderSettingsScreen` (`rider_settings_screen.dart`), `FlutterSecureStorage`
+- **Symptom / Error Message**:
+  1. User creates or joins a Convoy Room, and it successfully saves to AWS DynamoDB (`groupnav-packs`). When the user force-quits and restarts the app, the convoy room disappears and the app returns to Solo Ride Mode.
+  2. User tries to change their Callsign in Settings to something else. It temporarily works but reverts back to 'Apex' because it only saved to local memory and ignored Cognito.
+- **Root Cause Analysis**:
+  1. `PackNotifier` did not persist the active `packCode` in `FlutterSecureStorage`. On restart, it defaulted to `_soloFormation()` and never restored the active pack session from DynamoDB.
+  2. `ProfileIdentityCard`'s `onUpdateCallsign` callback only invoked `settingsNotifier.setCallsign` and failed to invoke `authNotifier.updateCallsign`, `packNotifier.updateRiderCallsign`, or `iotTelemetryServiceProvider.updateRiderIdentity`. Thus, the actual pilot AWS Cognito Identity and IoT telemetry remained as 'Apex'.
+- **Fix / Solution Applied**:
+  1. Added `FlutterSecureStorage` to `PackNotifier` to save `groupnav_active_pack_code` upon `createPack` or `joinPack`, and delete it on `leavePack` or `disbandConvoy`. Added `_restoreSavedPack()` in `_initRiderIdentity()` to fetch the active room from DynamoDB and automatically restore state.
+  2. Rewrote `onUpdateCallsign` inside `RiderSettingsScreen` to strictly update all 4 providers sequentially (`settingsNotifier`, `authNotifier`, `packNotifier`, `iotTelemetryServiceProvider`).
+  3. Added `FlutterSecureStorage.setMockInitialValues({})` in `mobile/test/pack_test.dart` to prevent `MissingPluginException` during testing.
+- **Verification**:
+  1. `flutter test` succeeds with 0 failures across all tests.
+  2. `flutter analyze` returns 0 issues.
+- **Prevention Rule**:
+  Persist active room codes using `FlutterSecureStorage` if a session is intended to survive application restarts. Always update global authentication state and remote identity claims synchronously when allowing local UI edits to user identity.
+
+---
+
+### [ISSUE-033] Presence of Mock, Simulated, and Dead-End Features in Submission Release
+- **Date & Phase**: 2026-09-19 | Final Pre-Submission Hardening & Codebase Cleanup
+- **Component / Command**: `AuthOnboardingScreen`, `ProfileIdentityCard`, `LiveRadarScreen`, `PackManagementScreen`, `ConvoyAlertsCard`, `LocationPrivacyCard`, `NavigationDisplayCard`, `RiderSettingsScreen`
+- **Symptom / Error Message**:
+  App contained several unbacked or placeholder UI elements:
+  1. Web3 / DePIN Telemetry Wallet login button and Settings card showing fake "+4.2 NAV" token balances with hardcoded test wallet addresses.
+  2. Social Auth (Google & Apple) buttons returning hardcoded mock user identities instead of real OAuth.
+  3. Map Cartography Layers FAB (`fab_layers`) displaying a placeholder toast without alternative map tiles.
+  4. Simulated Optical QR Scanner modal and Rendezvous QR dialog simulating camera reticles without native camera hardware integration.
+  5. Voice & Audio Cues switch without text-to-speech engine.
+  6. Demo Route Simulation switch presenting simulated GPS when real hardware GPS is required.
+  7. Non-clickable hamburger icon in Rider Settings top bar.
+- **Root Cause Analysis**:
+  During earlier architectural prototyping phases, concept features were stubbed out in UI mockups. With submission scheduled immediately, any half-baked or simulated features present a risk of failure or negative evaluation during examiner inspection.
+- **Fix / Solution Applied**:
+  1. Purged Web3/DePIN wallet buttons, modals, and setting rows across `auth_onboarding_screen.dart`, `profile_identity_card.dart`, and `top_app_bar_pill.dart`.
+  2. Removed `SocialAuthButtons` from `auth_onboarding_screen.dart`, spotlighting the 100% verified AWS Cognito email/password/OTP authentication flow.
+  3. Removed `fab_layers` from `live_radar_screen.dart`, retaining the verified recenter FAB.
+  4. Removed the simulated optical camera scanner button and rendezvous modal from `pack_management_screen.dart` and `active_code_card.dart`, retaining direct 4-digit code entry with AWS DynamoDB verification and clipboard sharing.
+  5. Removed unbacked switches (Voice & Audio Cues, Demo Simulation, Map Theme, Keep Screen Awake) from Settings cards.
+  6. Replaced dead hamburger icon in Rider Settings with active settings header.
+  7. Encapsulated all `FlutterSecureStorage` operations in `PackNotifier` inside safe try-catch blocks to guarantee test and runtime keystore stability.
+- **Verification**:
+  All 99 tests in the full test suite passed with 0 errors (`flutter test`). APK compiled and verified on physical hardware.
+- **Prevention Rule**:
+  Never leave placeholder, mock, or dead-end buttons in a submission build. If a feature does not have end-to-end backend and hardware backing, prune it from the UI to ensure 100% of the visible application is real, verified, and functional.

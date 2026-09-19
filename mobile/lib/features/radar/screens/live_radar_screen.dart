@@ -31,6 +31,7 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(locationServiceProvider).retryHardwareGps();
       final telemetryService = ref.read(iotTelemetryServiceProvider);
       _alertSub = telemetryService.alertStream.listen((alert) {
         if (!mounted) return;
@@ -195,10 +196,10 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
     }
 
     final activeRoute = radarState.activeRoute;
-    final routeTitle = activeRoute?.title ?? 'Skyline Summit Run';
+    final routeTitle = activeRoute?.title ?? 'Solo Tactical Navigation';
     final routeSubtitle = activeRoute != null
         ? '${activeRoute.distanceKm.toStringAsFixed(1)} km • ${activeRoute.estimatedMinutes} min'
-        : 'Tactical Corridor';
+        : 'Live GPS Corridor';
 
     return Scaffold(
       backgroundColor: AppColors.mapSurface,
@@ -513,38 +514,17 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
       ),
     ),
 
-          // 4. Right Floating Action Buttons (Layer Z-20)
+          // 4. Right Floating Recenter Action Button (Layer Z-20)
           Positioned(
             right: 14,
             bottom: 220,
-            child: Column(
-              children: [
-                FloatingActionButton.small(
-                  heroTag: 'fab_layers',
-                  backgroundColor: AppColors.cardBg,
-                  foregroundColor: AppColors.onSurfaceVariant,
-                  elevation: 3,
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Standard OpenStreetMap Cartography Active'),
-                        duration: Duration(seconds: 1),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                  child: const Icon(Icons.layers, size: 20),
-                ),
-                const SizedBox(height: 10),
-                FloatingActionButton(
-                  heroTag: 'fab_recenter',
-                  backgroundColor: AppColors.cardBg,
-                  foregroundColor: AppColors.primary,
-                  elevation: 4,
-                  onPressed: () => _recenterOnLeader(radarState.centerPosition),
-                  child: const Icon(Icons.my_location, size: 24),
-                ),
-              ],
+            child: FloatingActionButton(
+              heroTag: 'fab_recenter',
+              backgroundColor: AppColors.cardBg,
+              foregroundColor: AppColors.primary,
+              elevation: 4,
+              onPressed: () => _recenterOnLeader(radarState.centerPosition),
+              child: const Icon(Icons.my_location, size: 24),
             ),
           ),
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../radar/providers/radar_provider.dart';
@@ -34,6 +35,8 @@ class PackNotifier extends StateNotifier<PackFormation> {
   final IotTelemetryService? _telemetryService;
   final IQrScannerService? _qrScannerService;
   Timer? _rosterSyncTimer;
+  static const _storage = FlutterSecureStorage();
+  static const _activePackKey = 'groupnav_active_pack_code';
 
   PackNotifier([
     this._radarNotifier,
@@ -45,7 +48,8 @@ class PackNotifier extends StateNotifier<PackFormation> {
     _initRiderIdentity();
   }
 
-  static PackFormation _soloFormation([String callsign = 'Apex']) {
+  static PackFormation _soloFormation([String callsign = 'Pilot']) {
+    final effectiveCallsign = callsign.isNotEmpty ? callsign : 'Pilot';
     return PackFormation(
       packId: '',
       packCode: '',
@@ -56,8 +60,8 @@ class PackNotifier extends StateNotifier<PackFormation> {
       members: [
         PackMember(
           id: 'solo-rider',
-          callsign: '$callsign (You)',
-          initials: callsign.length >= 2 ? callsign.substring(0, 2).toUpperCase() : 'ME',
+          callsign: effectiveCallsign,
+          initials: effectiveCallsign.length >= 2 ? effectiveCallsign.substring(0, 2).toUpperCase() : 'ME',
           status: PackMemberStatus.lead,
           speedKmh: 0.0,
           offsetMeters: 0.0,
@@ -65,17 +69,94 @@ class PackNotifier extends StateNotifier<PackFormation> {
           latencyMs: 0,
           isLeader: true,
           role: PackRole.roadCaptain,
+          isCurrentUser: true,
         ),
       ],
     );
   }
 
   void _initRiderIdentity() {
+    _restoreSavedPack();
+    
+    if (_ref != null) {
+      final currentAuth = _ref.read(authNotifierProvider);
+      if (!state.isInPack && currentAuth.pilot != null) {
+        state = _soloFormation(currentAuth.pilot!.callsign);
+      }
+    }
     _ref?.listen(authNotifierProvider, (previous, next) {
       if (!state.isInPack && next.pilot != null) {
         state = _soloFormation(next.pilot!.callsign);
       }
     });
+  }
+
+  Future<void> _safeStorageWrite(String key, String value) async {
+    try {
+      await _storage.write(key: key, value: value);
+    } catch (e) {
+      debugPrint('[PackNotifier] Secure storage write error: $e');
+    }
+  }
+
+  Future<void> _safeStorageDelete(String key) async {
+    try {
+      await _storage.delete(key: key);
+    } catch (e) {
+      debugPrint('[PackNotifier] Secure storage delete error: $e');
+    }
+  }
+
+  Future<void> _restoreSavedPack() async {
+    try {
+      final savedCode = await _storage.read(key: _activePackKey);
+      if (savedCode != null && savedCode.isNotEmpty && _ref != null && _packService != null) {
+        final auth = _ref.read(authNotifierProvider);
+        final creds = auth.awsCredentials;
+        if (creds != null) {
+          try {
+            final restored = await _packService.getPack(
+              packCode: savedCode,
+              awsCredentials: creds,
+              currentRiderId: auth.pilot?.cognitoIdentityId ?? auth.pilot?.phoneOrEmail,
+            );
+            if (restored != null && mounted) {
+              state = restored.copyWith(isInPack: true);
+              _radarNotifier?.updateGeofenceRadius(restored.geofenceRadiusMeters);
+              _telemetryService?.updateActivePack(restored.packCode);
+              _startRosterPolling(restored.packCode);
+              debugPrint('[PackNotifier] Restored active pack room: $savedCode from DynamoDB');
+              return;
+            }
+          } catch (e) {
+            debugPrint('[PackNotifier] Failed to restore saved pack $savedCode: $e');
+          }
+        }
+        // If we reach here, we failed to restore or it's not active anymore.
+        await _safeStorageDelete(_activePackKey);
+      }
+    } catch (e) {
+      debugPrint('[PackNotifier] Secure storage read error: $e');
+    }
+  }
+
+  void updateRiderCallsign(String newCallsign) {
+    if (newCallsign.trim().isEmpty) return;
+    final updatedMembers = state.members.map((m) {
+      if (m.isCurrentUser) {
+        return m.copyWith(
+          callsign: newCallsign,
+          initials: newCallsign.length >= 2 ? newCallsign.substring(0, 2).toUpperCase() : 'ME',
+        );
+      }
+      return m;
+    }).toList();
+    
+    // Update local state (solo or pack)
+    state = state.copyWith(
+      members: updatedMembers,
+      // If Solo, update title or leave it. We just update members.
+    );
   }
 
   void updateGeofenceRadius(double radius) {
@@ -225,9 +306,10 @@ class PackNotifier extends StateNotifier<PackFormation> {
       }
     }
 
-    final callsign = auth?.pilot?.callsign ?? 'Apex';
+    final callsign = auth?.pilot?.callsign ?? 'Pilot';
     state = _soloFormation(callsign);
     _telemetryService?.updateActivePack('');
+    await _safeStorageDelete(_activePackKey);
   }
 
   /// Disband active convoy for everyone (Road Captain only)
@@ -247,6 +329,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
       }
     }
     await leavePack();
+    await _safeStorageDelete(_activePackKey);
   }
 
   /// Scan QR payload and join the pack automatically
@@ -278,6 +361,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
           ? customTitle.trim()
           : 'Pack Formation #$code';
 
+      const hostCallsign = 'Pilot';
       state = state.copyWith(
         isInPack: true,
         packCode: code,
@@ -289,10 +373,10 @@ class PackNotifier extends StateNotifier<PackFormation> {
         isLocked: false,
         hostRiderId: 'solo-rider',
         members: [
-          const PackMember(
+          PackMember(
             id: 'solo-rider',
-            callsign: 'Apex (You)',
-            initials: 'AP',
+            callsign: hostCallsign,
+            initials: hostCallsign.length >= 2 ? hostCallsign.substring(0, 2).toUpperCase() : 'ME',
             status: PackMemberStatus.lead,
             speedKmh: 0.0,
             offsetMeters: 0.0,
@@ -300,6 +384,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
             latencyMs: 0,
             isLeader: true,
             role: PackRole.roadCaptain,
+            isCurrentUser: true,
           ),
         ],
       );
@@ -321,6 +406,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
           ? customTitle.trim()
           : 'Pack Formation #$code';
 
+      final hostCallsign = auth.pilot?.callsign ?? 'Pilot';
       state = state.copyWith(
         isInPack: true,
         packCode: code,
@@ -332,10 +418,10 @@ class PackNotifier extends StateNotifier<PackFormation> {
         isLocked: false,
         hostRiderId: 'solo-rider',
         members: [
-          const PackMember(
+          PackMember(
             id: 'solo-rider',
-            callsign: 'Apex (You)',
-            initials: 'AP',
+            callsign: hostCallsign,
+            initials: hostCallsign.length >= 2 ? hostCallsign.substring(0, 2).toUpperCase() : 'ME',
             status: PackMemberStatus.lead,
             speedKmh: 0.0,
             offsetMeters: 0.0,
@@ -343,6 +429,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
             latencyMs: 0,
             isLeader: true,
             role: PackRole.roadCaptain,
+            isCurrentUser: true,
           ),
         ],
       );
@@ -384,6 +471,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
     );
     _radarNotifier?.updateGeofenceRadius(effectiveRadius);
     _telemetryService?.updateActivePack(formation.packCode);
+    await _safeStorageWrite(_activePackKey, formation.packCode);
     _startRosterPolling(code);
   }
 
@@ -439,6 +527,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
 
     state = formation.copyWith(isInPack: true);
     _telemetryService?.updateActivePack(formation.packCode);
+    await _safeStorageWrite(_activePackKey, formation.packCode);
     _startRosterPolling(cleanCode);
   }
 
@@ -454,7 +543,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
         final latest = await _packService.getPack(
           packCode: packCode,
           awsCredentials: creds,
-          currentRiderId: auth.pilot?.cognitoIdentityId,
+          currentRiderId: auth.pilot?.cognitoIdentityId ?? auth.pilot?.phoneOrEmail,
         );
         if (latest != null && mounted) {
           state = latest.copyWith(isInPack: true);

@@ -53,7 +53,7 @@ class PilotProfile {
   factory PilotProfile.fromJson(Map<String, dynamic> json) {
     return PilotProfile(
       phoneOrEmail: json['phoneOrEmail'] as String? ?? '',
-      callsign: json['callsign'] as String? ?? '0xApex',
+      callsign: json['callsign'] as String? ?? 'Pilot',
       vehicleClass: json['vehicleClass'] as String? ?? 'sportbike',
       beaconColor: json['beaconColor'] as String? ?? '#0066FF',
       cognitoIdentityId: json['cognitoIdentityId'] as String?,

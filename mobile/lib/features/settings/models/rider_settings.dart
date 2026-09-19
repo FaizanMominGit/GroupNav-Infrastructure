@@ -117,9 +117,9 @@ class RiderSettings {
   final String walletAddress;
 
   const RiderSettings({
-    this.callsign = '0xApex',
-    this.vehicle = 'Motorcycle (Ducati Panigale)',
-    this.emergencyContact = 'Elena (+1 555-0199)',
+    this.callsign = 'Pilot',
+    this.vehicle = 'Motorcycle',
+    this.emergencyContact = '',
     this.geofenceDepartureWarning = true,
     this.speedAlert = true,
     this.voiceAudioCues = true,

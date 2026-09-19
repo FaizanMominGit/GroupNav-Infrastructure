@@ -100,7 +100,7 @@ class DynamoDbPackService {
       members: [
         PackMember(
           id: hostRiderId,
-          callsign: '$hostCallsign (You)',
+          callsign: hostCallsign,
           initials: _extractInitials(hostCallsign),
           status: PackMemberStatus.lead,
           speedKmh: 0.0,
@@ -108,6 +108,8 @@ class DynamoDbPackService {
           offsetDescription: 'Road Captain (Host)',
           latencyMs: 0,
           isLeader: true,
+          role: PackRole.roadCaptain,
+          isCurrentUser: true,
         ),
       ],
     );
@@ -422,11 +424,9 @@ class DynamoDbPackService {
       if (map == null) continue;
 
       final id = map['id']?['S'] as String? ?? '';
-      var callsign = map['callsign']?['S'] as String? ?? 'Rider';
+      final rawCallsign = map['callsign']?['S'] as String? ?? 'Rider';
       final isCurrentUser = (currentRiderId != null && id == currentRiderId);
-      if (isCurrentUser && !callsign.contains('(You)')) {
-        callsign = '$callsign (You)';
-      }
+      final callsign = rawCallsign.replaceAll(' (You)', '').trim();
 
       final initials = map['initials']?['S'] as String? ?? _extractInitials(callsign);
       final isLeader = map['isLeader']?['BOOL'] as bool? ?? false;
@@ -464,6 +464,7 @@ class DynamoDbPackService {
         latencyMs: latencyMs,
         isLeader: isLeader,
         role: role,
+        isCurrentUser: isCurrentUser,
       ));
     }
 

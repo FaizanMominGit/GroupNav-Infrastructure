@@ -20,10 +20,10 @@ class IotTelemetryService {
   StreamSubscription<PositionData>? _locationSub;
   MqttServerClient? _mqttClient;
   bool _isMqttConnected = false;
-  String _currentRiderId = 'pilot';
-  String _currentCallsign = 'Apex';
+  String _currentRiderId = '';
+  String _currentCallsign = '';
   String _activePackCode = '';
-  bool _isLeader = true;
+  bool _isLeader = false;
   int _broadcastCount = 0;
   DateTime? _lastBroadcastTime;
 
@@ -205,8 +205,9 @@ class IotTelemetryService {
     if (locationService == null) return;
 
     _locationSub = locationService!.positionStream.listen((pos) {
+      final displayCallsign = _currentCallsign.isNotEmpty ? _currentCallsign : 'Pilot';
       final selfPeer = ConvoyPeer(
-        callsign: '$_currentCallsign (You)',
+        callsign: '$displayCallsign (You)',
         latitude: pos.latitude,
         longitude: pos.longitude,
         altitude: pos.altitude,
@@ -215,10 +216,11 @@ class IotTelemetryService {
         relativeOffsetMeters: 0,
         isLeader: _isLeader,
         beaconColorHex: '#0066FF',
-        monikerTag: _isLeader ? 'Lead' : 'HQ',
+        monikerTag: _isLeader ? 'Lead' : 'Rider',
       );
 
-      _activePeers[_currentRiderId] = selfPeer;
+      final effectiveRiderId = _currentRiderId.isNotEmpty ? _currentRiderId : 'self';
+      _activePeers[effectiveRiderId] = selfPeer;
       _emitPeers();
 
       if (_isBroadcasting && _isMqttConnected) {

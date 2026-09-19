@@ -4,8 +4,8 @@ import '../../../core/config/client_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../auth/widgets/web3_wallet_modal.dart';
 import '../../groups/providers/pack_provider.dart';
+import '../../radar/providers/radar_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/convoy_alerts_card.dart';
 import '../widgets/location_privacy_card.dart';
@@ -27,30 +27,6 @@ class RiderSettingsScreen extends ConsumerWidget {
     final packFormation = ref.watch(packNotifierProvider);
     final packNotifier = ref.read(packNotifierProvider.notifier);
 
-    void showWeb3WalletModal() {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (ctx) => Consumer(
-          builder: (context, ref, _) {
-            final currentAuthState = ref.watch(authNotifierProvider);
-            final currentAuthNotifier = ref.read(authNotifierProvider.notifier);
-            return Web3WalletModal(
-              isLinkingMode: true,
-              isConnecting: currentAuthState.isWeb3Connecting,
-              errorMessage: currentAuthState.errorMessage,
-              onConnect: (walletType, chain) async {
-                final success = await currentAuthNotifier.linkWeb3Wallet(walletType, chain: chain);
-                if (success && ctx.mounted) {
-                  Navigator.of(ctx).pop();
-                }
-              },
-            );
-          },
-        ),
-      );
-    }
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -87,15 +63,15 @@ class RiderSettingsScreen extends ConsumerWidget {
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
-                            Icons.menu,
-                            color: AppColors.textPrimary,
+                            Icons.settings,
+                            color: AppColors.primary,
                             size: 20,
                           ),
                         ),
                         const SizedBox(width: 10),
                         Flexible(
                           child: Text(
-                            'GroupNav',
+                            'Rider Settings',
                             overflow: TextOverflow.ellipsis,
                             style: AppTypography.headlineMd.copyWith(
                               fontWeight: FontWeight.w700,
@@ -154,9 +130,9 @@ class RiderSettingsScreen extends ConsumerWidget {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            settings.callsign.length >= 2
-                                ? settings.callsign.substring(0, 2).toUpperCase()
-                                : 'AP',
+                            (authState.pilot?.callsign ?? settings.callsign).length >= 2
+                                ? (authState.pilot?.callsign ?? settings.callsign).substring(0, 2).toUpperCase()
+                                : 'ME',
                             style: AppTypography.labelSm.copyWith(
                               color: AppColors.primary,
                               fontWeight: FontWeight.w800,
@@ -178,12 +154,19 @@ class RiderSettingsScreen extends ConsumerWidget {
                 children: [
                   // Section 1: Profile & Identity
                   ProfileIdentityCard(
-                    settings: settings,
-                    walletAddress: authState.pilot?.walletAddress,
-                    navBalance: authState.pilot?.navTokenBalance ?? 0.0,
-                    onConnectWallet: showWeb3WalletModal,
-                    onDisconnectWallet: () => authNotifier.disconnectWeb3Wallet(),
-                    onUpdateCallsign: settingsNotifier.setCallsign,
+                    settings: settings.copyWith(
+                      callsign: authState.pilot?.callsign ?? settings.callsign,
+                      vehicle: authState.pilot?.vehicleClass ?? settings.vehicle,
+                    ),
+                    onUpdateCallsign: (newCallsign) async {
+                      settingsNotifier.setCallsign(newCallsign);
+                      await authNotifier.updateCallsign(newCallsign);
+                      ref.read(packNotifierProvider.notifier).updateRiderCallsign(newCallsign);
+                      ref.read(iotTelemetryServiceProvider).updateRiderIdentity(
+                        riderId: authState.pilot?.cognitoIdentityId ?? authState.pilot?.phoneOrEmail ?? 'pilot',
+                        callsign: newCallsign,
+                      );
+                    },
                     onUpdateVehicle: settingsNotifier.setVehicle,
                     onUpdateEmergencyContact: settingsNotifier.setEmergencyContact,
                   ),
@@ -273,7 +256,6 @@ class RiderSettingsScreen extends ConsumerWidget {
                     settings: settings,
                     onToggleGeofenceWarning: settingsNotifier.toggleGeofenceDepartureWarning,
                     onToggleSpeedAlert: settingsNotifier.toggleSpeedAlert,
-                    onToggleVoiceAudioCues: settingsNotifier.toggleVoiceAudioCues,
                   ),
                   const SizedBox(height: 16),
 
@@ -291,7 +273,6 @@ class RiderSettingsScreen extends ConsumerWidget {
                     settings: settings,
                     onToggleShareLocation: settingsNotifier.toggleShareRealTimeLocation,
                     onGpsRateChanged: settingsNotifier.setGpsRate,
-                    onToggleDemoSimulation: settingsNotifier.toggleDemoSimulation,
                   ),
                   const SizedBox(height: 20),
 

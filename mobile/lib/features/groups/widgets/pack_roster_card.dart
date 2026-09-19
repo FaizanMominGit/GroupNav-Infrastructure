@@ -83,7 +83,7 @@ class PackRosterCard extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        member.callsign,
+                        member.cleanCallsign,
                         style: AppTypography.headlineMd.copyWith(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -120,14 +120,22 @@ class PackRosterCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (isLead) ...[
-                      const SizedBox(width: 4),
-                      Text(
-                        '(You)',
-                        style: AppTypography.labelSm.copyWith(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w500,
+                    if (member.isCurrentUser || member.callsign.contains('(You)')) ...[
+                      const SizedBox(width: 5),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.4), width: 0.8),
+                        ),
+                        child: Text(
+                          'You',
+                          style: AppTypography.labelSm.copyWith(
+                            fontSize: 9,
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ],

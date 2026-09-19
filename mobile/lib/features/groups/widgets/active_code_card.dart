@@ -4,7 +4,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../models/pack_formation.dart';
 import 'collapsed_mini_map.dart';
-import 'qr_pair_dialog.dart';
 
 class ActiveCodeCard extends StatelessWidget {
   final PackFormation formation;
@@ -18,7 +17,7 @@ class ActiveCodeCard extends StatelessWidget {
     super.key,
     required this.formation,
     required this.onExpandMap,
-    required this.qrPayload,
+    this.qrPayload = '',
     this.isCaptain = false,
     this.onToggleLock,
     this.onDisband,
@@ -202,51 +201,6 @@ class ActiveCodeCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 8),
-
-              // Pair QR Action Button
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => QrPairDialog.show(
-                    context,
-                    packCode: formation.packCode,
-                    packId: formation.packId,
-                    qrPayload: qrPayload,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLowest,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.borderSubtle),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.qr_code_2, size: 24, color: AppColors.textPrimary),
-                        const SizedBox(height: 2),
-                        Text(
-                          'QR Code',
-                          style: AppTypography.labelSm.copyWith(
-                            fontSize: 9,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               ),
             ],

@@ -128,12 +128,32 @@ final iotTelemetryServiceProvider = Provider<IotTelemetryService>((ref) {
   final locationService = ref.watch(locationServiceProvider);
   final service = IotTelemetryService(config: config, locationService: locationService);
 
+  // Read initial auth state if already authenticated
+  final initialAuth = ref.read(authNotifierProvider);
+  if (initialAuth.pilot != null) {
+    service.updateRiderIdentity(
+      riderId: initialAuth.pilot!.cognitoIdentityId ?? initialAuth.pilot!.phoneOrEmail,
+      callsign: initialAuth.pilot!.callsign,
+    );
+  }
+  final initialCreds = initialAuth.awsCredentials;
+  if (initialCreds != null &&
+      initialCreds['AccessKeyId'] != null &&
+      initialCreds['SecretKey'] != null &&
+      !service.isMqttConnected) {
+    service.connectMqtt(
+      accessKeyId: initialCreds['AccessKeyId']!,
+      secretKey: initialCreds['SecretKey']!,
+      sessionToken: initialCreds['SessionToken'],
+    );
+  }
+
   // When auth credentials change, connect MQTT with authentic SigV4 credentials
   ref.listen<AuthState>(authNotifierProvider, (previous, next) {
     final creds = next.awsCredentials;
     if (next.pilot != null) {
       service.updateRiderIdentity(
-        riderId: next.pilot!.cognitoIdentityId ?? 'pilot',
+        riderId: next.pilot!.cognitoIdentityId ?? next.pilot!.phoneOrEmail,
         callsign: next.pilot!.callsign,
       );
     }
@@ -168,10 +188,7 @@ class RadarNotifier extends StateNotifier<RadarState> {
   final IotTelemetryService _telemetryService;
 
   RadarNotifier(this._telemetryService)
-      : super(RadarState(
-          activeRoute: ConvoyRoute.defaultRoutes.first,
-          routeWaypoints: ConvoyRoute.defaultRoutes.first.waypoints,
-        )) {
+      : super(const RadarState()) {
     _listenToTelemetry();
     _listenToConnection();
     _listenToRouteUpdates();

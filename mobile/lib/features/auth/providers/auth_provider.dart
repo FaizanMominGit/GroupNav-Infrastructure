@@ -51,7 +51,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   String _email = '';
   String _password = '';
-  String _callsign = 'Apex';
+  String _callsign = '';
   String _selectedVehicleClass = 'sportbike';
   String _selectedBeaconColor = '#0066FF';
   bool _isSignUpMode = false;
@@ -79,6 +79,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
   void setEmail(String value) => _email = value.trim();
   void setPassword(String value) => _password = value;
   void setCallsign(String value) => _callsign = value.trim();
+
+  Future<void> updateCallsign(String newCallsign) async {
+    final clean = newCallsign.trim();
+    if (clean.isEmpty) return;
+    _callsign = clean;
+    if (state.pilot != null) {
+      state = state.copyWith(
+        pilot: state.pilot!.copyWith(callsign: clean),
+      );
+    }
+    await _authService.updateCallsign(clean);
+  }
+
   void toggleSignUpMode() {
     _isSignUpMode = !_isSignUpMode;
     state = state.copyWith(errorMessage: null);
@@ -107,6 +120,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final savedPilot = await _authService.restoreSession();
       if (savedPilot != null) {
+        _callsign = savedPilot.callsign;
         final creds = await _authService.getCachedCredentials();
         state = state.copyWith(
           status: AuthStatus.authenticated,
@@ -280,16 +294,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final result = await _authService.signIn(
         email: _email,
         password: _password,
-        callsign: _callsign,
+        callsign: _callsign.trim().isNotEmpty ? _callsign.trim() : null,
         vehicleClass: _selectedVehicleClass,
         beaconColor: _selectedBeaconColor,
       );
 
       _countdownTimer?.cancel();
 
+      final authenticatedPilot = result['pilot'] as PilotProfile?;
+      if (authenticatedPilot != null) {
+        _callsign = authenticatedPilot.callsign;
+      }
+
       state = state.copyWith(
         status: AuthStatus.authenticated,
-        pilot: result['pilot'] as PilotProfile?,
+        pilot: authenticatedPilot,
         awsCredentials: result['awsCredentials'] as Map<String, String>?,
         errorMessage: null,
       );
@@ -600,6 +619,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> signOut() async {
     _countdownTimer?.cancel();
+    _email = '';
+    _password = '';
+    _callsign = '';
     await _authService.signOut();
     await _socialAuthService.signOut();
     await _web3WalletService.disconnectWallet();

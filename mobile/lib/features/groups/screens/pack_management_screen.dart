@@ -8,7 +8,6 @@ import '../models/pack_formation.dart';
 import '../models/pack_member.dart';
 import '../providers/pack_provider.dart';
 import '../widgets/active_code_card.dart';
-import '../widgets/camera_qr_scanner_modal.dart';
 import '../widgets/create_convoy_sheet.dart';
 import '../widgets/geofence_slider_widget.dart';
 import '../widgets/pack_roster_card.dart';
@@ -456,28 +455,6 @@ class PackManagementScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-
-              // Optical Camera QR Code Scanner Button
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _openCameraScanner(context, packNotifier),
-                  icon: const Icon(Icons.qr_code_scanner, size: 18, color: AppColors.secondary),
-                  label: Text(
-                    'Scan QR Code / Share Link',
-                    style: AppTypography.labelMd.copyWith(
-                      color: AppColors.secondary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.secondary),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -501,44 +478,6 @@ class PackManagementScreen extends ConsumerWidget {
           ),
       ],
     );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Camera QR Scanner Modal
-  // ---------------------------------------------------------------------------
-  Future<void> _openCameraScanner(BuildContext context, PackNotifier notifier) async {
-    final scannedResult = await CameraQrScannerModal.show(context);
-    if (scannedResult != null && scannedResult.isNotEmpty && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Processing convoy QR: $scannedResult'),
-          backgroundColor: AppColors.primary,
-          duration: const Duration(seconds: 1),
-        ),
-      );
-      try {
-        await notifier.scanAndJoinQr(scannedResult);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Successfully joined convoy via optical QR scanner!'),
-              backgroundColor: AppColors.telemetryEmerald,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(e.toString().replaceAll('Exception: ', '')),
-              backgroundColor: AppColors.alertCritical,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-      }
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -741,47 +680,29 @@ class PackManagementScreen extends ConsumerWidget {
                   ),
                 ],
                 const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    TextButton.icon(
-                      onPressed: isJoining
-                          ? null
-                          : () {
-                              Navigator.of(ctx).pop();
-                              _openCameraScanner(context, notifier);
-                            },
-                      icon: const Icon(Icons.qr_code_scanner, size: 14, color: AppColors.primary),
-                      label: Text(
-                        'Scan QR',
-                        style: AppTypography.labelSm.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: isJoining
+                        ? null
+                        : () async {
+                            final data = await Clipboard.getData(Clipboard.kTextPlain);
+                            if (data?.text != null && data!.text!.trim().isNotEmpty) {
+                              setState(() {
+                                controller.text = data.text!.trim();
+                                localError = null;
+                              });
+                            }
+                          },
+                    icon: const Icon(Icons.paste, size: 14, color: AppColors.secondary),
+                    label: Text(
+                      'Paste Clipboard',
+                      style: AppTypography.labelSm.copyWith(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    TextButton.icon(
-                      onPressed: isJoining
-                          ? null
-                          : () async {
-                              final data = await Clipboard.getData(Clipboard.kTextPlain);
-                              if (data?.text != null && data!.text!.trim().isNotEmpty) {
-                                setState(() {
-                                  controller.text = data.text!.trim();
-                                  localError = null;
-                                });
-                              }
-                            },
-                      icon: const Icon(Icons.paste, size: 14, color: AppColors.secondary),
-                      label: Text(
-                        'Paste Clipboard',
-                        style: AppTypography.labelSm.copyWith(
-                          color: AppColors.secondary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),

@@ -27,6 +27,7 @@ class PackMember {
   final bool isLeader;
   final String? warningDescription;
   final PackRole role;
+  final bool isCurrentUser;
 
   const PackMember({
     required this.id,
@@ -41,7 +42,10 @@ class PackMember {
     this.isLeader = false,
     this.warningDescription,
     this.role = PackRole.packMember,
+    this.isCurrentUser = false,
   });
+
+  String get cleanCallsign => callsign.replaceAll(' (You)', '').trim();
 
   bool get isRoadCaptain => role == PackRole.roadCaptain || isLeader;
   bool get isTailGunner => role == PackRole.tailGunner;
@@ -169,6 +173,7 @@ class PackMember {
     bool? isLeader,
     String? warningDescription,
     PackRole? role,
+    bool? isCurrentUser,
   }) {
     return PackMember(
       id: id ?? this.id,
@@ -183,6 +188,7 @@ class PackMember {
       isLeader: isLeader ?? this.isLeader,
       warningDescription: warningDescription ?? this.warningDescription,
       role: role ?? this.role,
+      isCurrentUser: isCurrentUser ?? this.isCurrentUser,
     );
   }
 }

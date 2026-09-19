@@ -150,9 +150,9 @@ void main() {
 
     test('Profile & Identity mutations update state correctly', () {
       final notifier = SettingsNotifier();
-      expect(notifier.state.callsign, '0xApex');
-      expect(notifier.state.vehicle, 'Motorcycle (Ducati Panigale)');
-      expect(notifier.state.emergencyContact, 'Elena (+1 555-0199)');
+      expect(notifier.state.callsign, 'Pilot');
+      expect(notifier.state.vehicle, 'Motorcycle');
+      expect(notifier.state.emergencyContact, '');
 
       notifier.setCallsign('ViperOne');
       notifier.setVehicle('BMW S1000RR');

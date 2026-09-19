@@ -47,8 +47,15 @@ This document defines the infrastructure build order, the architecture decisions
 - Identity Pool — issues short-lived IAM credentials so mobile clients talk directly to IoT Core and Location Service without a proxy
 
 ### 3.3 Amazon Location Service
-- Map resource + Geofence Collection
-- IAM policy scoped narrowly to the Cognito **authenticated** role: read-only map tiles and geofence evaluation only — not management APIs
+- **Map Resource**: `GroupNavMap` (`VectorEsriNavigation`) for high-contrast vector cartography.
+- **Geofence Collection**: `GroupNavGeofenceCollection` for pack boundary and proximity monitoring.
+- **Route Calculator**: `GroupNavRouteCalculator` (`dataSource: Esri`, `pricingPlan: RequestBasedUsage`) for multi-waypoint road-following geometry, road distances, and durations.
+- **Place Index**: `GroupNavPlaceIndex` (`dataSource: Esri`, `pricingPlan: RequestBasedUsage`) for tactical address search, landmark geocoding, and autocomplete.
+- **IAM Scoped Permissions**: Narrowly scoped on the Cognito **authenticated** role:
+  - Map tiles: `geo:GetMapGlyphs`, `geo:GetMapSprites`, `geo:GetMapStyleDescriptor`, `geo:GetMapTile`.
+  - Geofences: `geo:BatchEvaluateGeofences`, `geo:GetGeofence`, `geo:ListGeofences`.
+  - Routing: `geo:CalculateRoute`, `geo:CalculateRouteMatrix` on Route Calculator ARN.
+  - Places: `geo:SearchPlaceIndexForText`, `geo:SearchPlaceIndexForPosition`, `geo:SearchPlaceIndexForSuggestions` on Place Index ARN.
 
 ### 3.4 Security Groups (defined here, not deferred)
 - `ComputeSG` — attached to Lambda

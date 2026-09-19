@@ -1,5 +1,66 @@
 import 'package:latlong2/latlong.dart';
 
+enum RouteStopType {
+  origin,
+  waypoint,
+  destination,
+}
+
+class RouteStop {
+  final String id;
+  final String name;
+  final double latitude;
+  final double longitude;
+  final RouteStopType type;
+
+  const RouteStop({
+    required this.id,
+    required this.name,
+    required this.latitude,
+    required this.longitude,
+    this.type = RouteStopType.waypoint,
+  });
+
+  LatLng get toLatLng => LatLng(latitude, longitude);
+
+  String get typeLabel {
+    switch (type) {
+      case RouteStopType.origin:
+        return 'START';
+      case RouteStopType.destination:
+        return 'FINISH';
+      case RouteStopType.waypoint:
+        return 'STOP';
+    }
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'lat': latitude,
+        'lng': longitude,
+        'type': type.name,
+      };
+
+  factory RouteStop.fromJson(Map<String, dynamic> json) {
+    final typeStr = json['type'] as String? ?? 'waypoint';
+    RouteStopType parsedType = RouteStopType.waypoint;
+    if (typeStr == 'origin') {
+      parsedType = RouteStopType.origin;
+    } else if (typeStr == 'destination') {
+      parsedType = RouteStopType.destination;
+    }
+
+    return RouteStop(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'Stop',
+      latitude: (json['lat'] as num?)?.toDouble() ?? 0.0,
+      longitude: (json['lng'] as num?)?.toDouble() ?? 0.0,
+      type: parsedType,
+    );
+  }
+}
+
 class ConvoyRoute {
   final String id;
   final String title;
@@ -9,6 +70,8 @@ class ConvoyRoute {
   final String recommendedFormation;
   final String difficultyLevel;
   final List<LatLng> waypoints;
+  final List<RouteStop> stops;
+  final bool isCustom;
 
   const ConvoyRoute({
     required this.id,
@@ -19,12 +82,35 @@ class ConvoyRoute {
     required this.recommendedFormation,
     this.difficultyLevel = 'MODERATE',
     required this.waypoints,
+    this.stops = const [],
+    this.isCustom = false,
   });
 
-  LatLng get startPoint => waypoints.isNotEmpty ? waypoints.first : const LatLng(19.0760, 72.8777);
-  LatLng get endPoint => waypoints.isNotEmpty ? waypoints.last : const LatLng(19.0760, 72.8777);
+  LatLng get startPoint {
+    if (stops.isNotEmpty) {
+      final origin = stops.firstWhere(
+        (s) => s.type == RouteStopType.origin,
+        orElse: () => stops.first,
+      );
+      return origin.toLatLng;
+    }
+    return waypoints.isNotEmpty ? waypoints.first : const LatLng(19.0760, 72.8777);
+  }
+
+  LatLng get endPoint {
+    if (stops.isNotEmpty) {
+      final dest = stops.lastWhere(
+        (s) => s.type == RouteStopType.destination,
+        orElse: () => stops.last,
+      );
+      return dest.toLatLng;
+    }
+    return waypoints.isNotEmpty ? waypoints.last : const LatLng(19.0760, 72.8777);
+  }
+
   String get description => subtitle;
   int get estimatedMinutes => (distanceKm / 55.0 * 60.0).clamp(5, 300).round();
+  int get intermediateStopsCount => stops.where((s) => s.type == RouteStopType.waypoint).length;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -35,6 +121,8 @@ class ConvoyRoute {
         'recommendedFormation': recommendedFormation,
         'difficultyLevel': difficultyLevel,
         'waypoints': waypoints.map((p) => {'lat': p.latitude, 'lng': p.longitude}).toList(),
+        'stops': stops.map((s) => s.toJson()).toList(),
+        'isCustom': isCustom,
       };
 
   factory ConvoyRoute.fromJson(Map<String, dynamic> json) {
@@ -45,6 +133,9 @@ class ConvoyRoute {
       return LatLng(lat, lng);
     }).toList();
 
+    final rawStops = json['stops'] as List<dynamic>? ?? [];
+    final stopsList = rawStops.map((s) => RouteStop.fromJson(s as Map<String, dynamic>)).toList();
+
     return ConvoyRoute(
       id: json['id'] as String? ?? 'route_default',
       title: json['title'] as String? ?? 'Custom Course',
@@ -54,8 +145,11 @@ class ConvoyRoute {
       recommendedFormation: json['recommendedFormation'] as String? ?? 'STAGGERED',
       difficultyLevel: json['difficultyLevel'] as String? ?? 'MODERATE',
       waypoints: pts,
+      stops: stopsList,
+      isCustom: json['isCustom'] as bool? ?? false,
     );
   }
+
 
   /// Curated tactical route catalog for motorcycle convoys
   static const List<ConvoyRoute> defaultRoutes = [

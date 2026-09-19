@@ -6,6 +6,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/top_app_bar_pill.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/beacon_color_picker.dart';
+import '../widgets/forgot_password_dialog.dart';
 import '../widgets/otp_verification_dialog.dart';
 import '../widgets/vehicle_class_selector.dart';
 
@@ -37,6 +38,74 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
     _passwordController.dispose();
     _callsignController.dispose();
     super.dispose();
+  }
+
+  void _showForgotPasswordDialog(BuildContext context) {
+    final authNotifier = ref.read(authNotifierProvider.notifier);
+    authNotifier.clearPasswordResetState();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Consumer(
+        builder: (context, ref, _) {
+          final state = ref.watch(authNotifierProvider);
+          return ForgotPasswordDialog(
+            initialEmail: _emailController.text.trim(),
+            resendCountdown: state.resendCountdown,
+            isLoading: state.isPasswordResetLoading,
+            errorMessage: state.passwordResetError,
+            destination: state.passwordResetDestination,
+            onRequestCode: (email) async {
+              final result = await authNotifier.sendPasswordResetCode(email);
+              return result != null;
+            },
+            onConfirmReset: ({
+              required String email,
+              required String code,
+              required String newPassword,
+            }) async {
+              return await authNotifier.confirmPasswordReset(
+                email: email,
+                code: code,
+                newPassword: newPassword,
+              );
+            },
+            onSuccess: (email, newPassword) {
+              Navigator.of(ctx).pop();
+              _emailController.text = email;
+              _passwordController.text = newPassword;
+              authNotifier.setEmail(email);
+              authNotifier.setPassword(newPassword);
+              authNotifier.clearPasswordResetState();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Password updated successfully! You can now sign in.',
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: AppColors.telemetryEmerald,
+                  behavior: SnackBarBehavior.floating,
+                  duration: Duration(seconds: 4),
+                ),
+              );
+            },
+            onCancel: () {
+              Navigator.of(ctx).pop();
+              authNotifier.clearPasswordResetState();
+            },
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -305,7 +374,32 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                   ),
                                   onChanged: authNotifier.setPassword,
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 8),
+
+                                // Forgot Password Link in Sign In Mode
+                                if (!authNotifier.isSignUpMode) ...[
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      onPressed: () => _showForgotPasswordDialog(context),
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      child: Text(
+                                        'Forgot Password?',
+                                        style: AppTypography.labelSm.copyWith(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                ] else ...[
+                                  const SizedBox(height: 6),
+                                ],
 
                                 // Callsign Field (Visible in Sign Up mode)
                                 if (authNotifier.isSignUpMode) ...[

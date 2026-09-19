@@ -14,6 +14,14 @@ export interface AuthStackProps extends cdk.StackProps {
    * Name of the Amazon Location Service Geofence Collection. Defaults to GroupNavGeofenceCollection.
    */
   geofenceCollectionName?: string;
+  /**
+   * Name of the Amazon Location Service Route Calculator. Defaults to GroupNavRouteCalculator.
+   */
+  routeCalculatorName?: string;
+  /**
+   * Name of the Amazon Location Service Place Index. Defaults to GroupNavPlaceIndex.
+   */
+  placeIndexName?: string;
 }
 
 export class AuthStack extends cdk.Stack {
@@ -35,6 +43,12 @@ export class AuthStack extends cdk.Stack {
   /** Amazon Location Service Geofence Collection */
   public readonly geofenceCollection: location.CfnGeofenceCollection;
 
+  /** Amazon Location Service Route Calculator */
+  public readonly routeCalculator: location.CfnRouteCalculator;
+
+  /** Amazon Location Service Place Index */
+  public readonly placeIndex: location.CfnPlaceIndex;
+
   /** DynamoDB table storing real pack room state, rosters, and geofence config */
   public readonly packsTable: dynamodb.Table;
 
@@ -43,6 +57,8 @@ export class AuthStack extends cdk.Stack {
 
     const mapName = props?.mapName ?? 'GroupNavMap';
     const geofenceCollectionName = props?.geofenceCollectionName ?? 'GroupNavGeofenceCollection';
+    const routeCalculatorName = props?.routeCalculatorName ?? 'GroupNavRouteCalculator';
+    const placeIndexName = props?.placeIndexName ?? 'GroupNavPlaceIndex';
 
     // 1. Cognito User Pool (Section 3.2)
     // Manages rider identities, email verification, and secure authentication.
@@ -120,6 +136,20 @@ export class AuthStack extends cdk.Stack {
       pricingPlan: 'RequestBasedUsage',
     });
 
+    this.routeCalculator = new location.CfnRouteCalculator(this, 'RouteCalculator', {
+      calculatorName: routeCalculatorName,
+      dataSource: 'Esri',
+      description: 'GroupNav route calculator for multi-waypoint road navigation',
+      pricingPlan: 'RequestBasedUsage',
+    });
+
+    this.placeIndex = new location.CfnPlaceIndex(this, 'PlaceIndex', {
+      indexName: placeIndexName,
+      dataSource: 'Esri',
+      description: 'GroupNav place index for tactical landmark and address search',
+      pricingPlan: 'RequestBasedUsage',
+    });
+
     // 5. DynamoDB Pack Rooms Table
     // Persistent store for real convoy rooms, host assignments, geofence radius, and active member rosters
     this.packsTable = new dynamodb.Table(this, 'GroupNavPacksTable', {
@@ -174,6 +204,25 @@ export class AuthStack extends cdk.Stack {
             'geo:ListGeofences',
           ],
           resources: [this.geofenceCollection.attrArn],
+        }),
+        new iam.PolicyStatement({
+          sid: 'AllowCalculateRoute',
+          effect: iam.Effect.ALLOW,
+          actions: [
+            'geo:CalculateRoute',
+            'geo:CalculateRouteMatrix',
+          ],
+          resources: [this.routeCalculator.attrArn],
+        }),
+        new iam.PolicyStatement({
+          sid: 'AllowSearchPlaceIndex',
+          effect: iam.Effect.ALLOW,
+          actions: [
+            'geo:SearchPlaceIndexForText',
+            'geo:SearchPlaceIndexForPosition',
+            'geo:SearchPlaceIndexForSuggestions',
+          ],
+          resources: [this.placeIndex.attrArn],
         }),
       ],
     });
@@ -294,6 +343,26 @@ export class AuthStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'GeofenceCollectionArn', {
       value: this.geofenceCollection.attrArn,
       description: 'Amazon Location Service Geofence Collection ARN',
+    });
+
+    new cdk.CfnOutput(this, 'RouteCalculatorName', {
+      value: this.routeCalculator.calculatorName,
+      description: 'Amazon Location Service Route Calculator Name',
+    });
+
+    new cdk.CfnOutput(this, 'RouteCalculatorArn', {
+      value: this.routeCalculator.attrArn,
+      description: 'Amazon Location Service Route Calculator ARN',
+    });
+
+    new cdk.CfnOutput(this, 'PlaceIndexName', {
+      value: this.placeIndex.indexName,
+      description: 'Amazon Location Service Place Index Name',
+    });
+
+    new cdk.CfnOutput(this, 'PlaceIndexArn', {
+      value: this.placeIndex.attrArn,
+      description: 'Amazon Location Service Place Index ARN',
     });
 
     new cdk.CfnOutput(this, 'PackTableName', {

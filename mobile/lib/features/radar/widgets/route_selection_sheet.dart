@@ -6,19 +6,28 @@ import '../models/convoy_route.dart';
 
 class RouteSelectionSheet extends StatelessWidget {
   final ConvoyRoute? currentRoute;
+  final List<ConvoyRoute> customRoutes;
   final ValueChanged<ConvoyRoute> onSelectRoute;
+  final VoidCallback? onCreateCustomRoute;
 
   const RouteSelectionSheet({
     super.key,
     required this.currentRoute,
+    this.customRoutes = const [],
     required this.onSelectRoute,
+    this.onCreateCustomRoute,
   });
 
   @override
   Widget build(BuildContext context) {
+    final allRoutes = [
+      ...customRoutes,
+      ...ConvoyRoute.defaultRoutes.where((d) => !customRoutes.any((c) => c.id == d.id)),
+    ];
+
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
+        maxHeight: MediaQuery.of(context).size.height * 0.80,
       ),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       decoration: BoxDecoration(
@@ -118,16 +127,55 @@ class RouteSelectionSheet extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
+
+          // Create Custom Route Button
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              Navigator.of(context).pop();
+              onCreateCustomRoute?.call();
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary.withValues(alpha: 0.18),
+                    AppColors.secondary.withValues(alpha: 0.12),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary, width: 1.5),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.add_location_alt_outlined, color: AppColors.primary, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    '+ BUILD CUSTOM MULTI-STOP ROUTE',
+                    style: AppTypography.labelMd.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
 
           // Route Cards List
           Flexible(
             child: ListView.separated(
               shrinkWrap: true,
-              itemCount: ConvoyRoute.defaultRoutes.length,
+              itemCount: allRoutes.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
-                final route = ConvoyRoute.defaultRoutes[index];
+                final route = allRoutes[index];
                 final isSelected = currentRoute?.id == route.id;
 
                 return GestureDetector(
@@ -223,6 +271,12 @@ class RouteSelectionSheet extends StatelessWidget {
                               label: route.recommendedFormation,
                               color: AppColors.primary,
                             ),
+                            if (route.isCustom && route.stops.isNotEmpty)
+                              _buildBadge(
+                                icon: Icons.flag_circle_outlined,
+                                label: '${route.stops.length} STOPS',
+                                color: AppColors.secondary,
+                              ),
                           ],
                         ),
                       ],

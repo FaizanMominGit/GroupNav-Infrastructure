@@ -108,28 +108,67 @@ describe('AuthStack', () => {
     });
   });
 
-  test('attaches strictly scoped Location Service policy (read-only tiles & geofence evaluation)', () => {
+  test('creates Amazon Location Service Route Calculator and Place Index', () => {
+    template.resourceCountIs('AWS::Location::RouteCalculator', 1);
+    template.hasResourceProperties('AWS::Location::RouteCalculator', {
+      CalculatorName: 'GroupNavRouteCalculator',
+      DataSource: 'Esri',
+    });
+
+    template.resourceCountIs('AWS::Location::PlaceIndex', 1);
+    template.hasResourceProperties('AWS::Location::PlaceIndex', {
+      IndexName: 'GroupNavPlaceIndex',
+      DataSource: 'Esri',
+    });
+  });
+
+  test('attaches strictly scoped Location Service policy (read-only tiles, geofences, routing, and places)', () => {
     template.hasResourceProperties('AWS::IAM::Policy', {
       PolicyName: 'GroupNav-Rider-Location-Access',
       PolicyDocument: {
         Statement: Match.arrayWith([
           Match.objectLike({
-            Action: [
-              'geo:GetMapTile',
-              'geo:GetMapSprites',
+            Action: Match.arrayWith([
               'geo:GetMapGlyphs',
+              'geo:GetMapSprites',
               'geo:GetMapStyleDescriptor',
-            ],
+              'geo:GetMapTile',
+            ]),
             Effect: 'Allow',
             Resource: {
               'Fn::GetAtt': [Match.stringLikeRegexp('LocationMap.*'), 'Arn'],
             },
           }),
           Match.objectLike({
-            Action: 'geo:BatchEvaluateGeofences',
+            Action: Match.arrayWith([
+              'geo:BatchEvaluateGeofences',
+              'geo:GetGeofence',
+              'geo:ListGeofences',
+            ]),
             Effect: 'Allow',
             Resource: {
               'Fn::GetAtt': [Match.stringLikeRegexp('GeofenceCollection.*'), 'Arn'],
+            },
+          }),
+          Match.objectLike({
+            Action: [
+              'geo:CalculateRoute',
+              'geo:CalculateRouteMatrix',
+            ],
+            Effect: 'Allow',
+            Resource: {
+              'Fn::GetAtt': [Match.stringLikeRegexp('RouteCalculator.*'), 'Arn'],
+            },
+          }),
+          Match.objectLike({
+            Action: [
+              'geo:SearchPlaceIndexForText',
+              'geo:SearchPlaceIndexForPosition',
+              'geo:SearchPlaceIndexForSuggestions',
+            ],
+            Effect: 'Allow',
+            Resource: {
+              'Fn::GetAtt': [Match.stringLikeRegexp('PlaceIndex.*'), 'Arn'],
             },
           }),
         ]),
@@ -164,6 +203,10 @@ describe('AuthStack', () => {
     template.hasOutput('MapArn', {});
     template.hasOutput('GeofenceCollectionName', {});
     template.hasOutput('GeofenceCollectionArn', {});
+    template.hasOutput('RouteCalculatorName', {});
+    template.hasOutput('RouteCalculatorArn', {});
+    template.hasOutput('PlaceIndexName', {});
+    template.hasOutput('PlaceIndexArn', {});
     template.hasOutput('AuthenticatedRoleArn', {});
   });
 });

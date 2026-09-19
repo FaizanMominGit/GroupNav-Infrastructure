@@ -11,6 +11,7 @@ import '../../groups/providers/pack_provider.dart';
 import '../models/convoy_route.dart';
 import '../providers/radar_provider.dart';
 import '../widgets/convoy_marker_widget.dart';
+import '../widgets/create_route_sheet.dart';
 import '../widgets/radar_hud_sheet.dart';
 import '../widgets/route_selection_sheet.dart';
 
@@ -70,13 +71,29 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
     _mapController.move(leaderPos, 15.5);
   }
 
-  void _showRouteSelectionSheet(BuildContext context, ConvoyRoute? currentRoute, RadarNotifier radarNotifier) {
+  void _showCreateRouteSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => const CreateRouteSheet(),
+    );
+  }
+
+  void _showRouteSelectionSheet(
+    BuildContext context,
+    ConvoyRoute? currentRoute,
+    RadarNotifier radarNotifier,
+    List<ConvoyRoute> customRoutes,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => RouteSelectionSheet(
         currentRoute: currentRoute,
+        customRoutes: customRoutes,
+        onCreateCustomRoute: () => _showCreateRouteSheet(context),
         onSelectRoute: (selectedRoute) {
           radarNotifier.setRoute(selectedRoute, broadcast: true);
           ScaffoldMessenger.of(context).showSnackBar(
@@ -236,16 +253,91 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
                   ],
                 ),
 
-              // Convoy Participant Markers Layer
+              // Convoy Participant & Route Stop Markers Layer
               MarkerLayer(
-                markers: radarState.peers.map((peer) {
-                  return Marker(
-                    point: LatLng(peer.latitude, peer.longitude),
-                    width: peer.isLeader ? 150 : 120,
-                    height: peer.isLeader ? 84 : 68,
-                    child: ConvoyMarkerWidget(peer: peer),
-                  );
-                }).toList(),
+                markers: [
+                  // Route Stop Markers
+                  if (radarState.activeRoute != null && radarState.activeRoute!.stops.isNotEmpty)
+                    ...radarState.activeRoute!.stops.map((stop) {
+                      Color stopColor;
+                      switch (stop.type) {
+                        case RouteStopType.origin:
+                          stopColor = AppColors.primary;
+                          break;
+                        case RouteStopType.destination:
+                          stopColor = AppColors.error;
+                          break;
+                        case RouteStopType.waypoint:
+                          stopColor = AppColors.secondary;
+                          break;
+                      }
+
+                      return Marker(
+                        point: stop.toLatLng,
+                        width: 130,
+                        height: 48,
+                        alignment: Alignment.topCenter,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.cardBg,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: stopColor, width: 1.5),
+                                boxShadow: AppTheme.elevationLevel1,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: stopColor,
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: Text(
+                                      stop.typeLabel,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      stop.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.arrow_drop_down, color: stopColor, size: 14),
+                          ],
+                        ),
+                      );
+                    }),
+
+                  // Rider Convoy Peer Markers
+                  ...radarState.peers.map((peer) {
+                    return Marker(
+                      point: LatLng(peer.latitude, peer.longitude),
+                      width: peer.isLeader ? 150 : 120,
+                      height: peer.isLeader ? 84 : 68,
+                      child: ConvoyMarkerWidget(peer: peer),
+                    );
+                  }),
+                ],
               ),
             ],
           ),
@@ -309,7 +401,7 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
                   child: InkWell(
                     onTap: () {
                       if (isLeader) {
-                        _showRouteSelectionSheet(context, activeRoute, radarNotifier);
+                        _showRouteSelectionSheet(context, activeRoute, radarNotifier, radarState.customRoutes);
                       } else {
                         _showFollowerLockedDialog(context);
                       }

@@ -1,9 +1,11 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:groupnav_mobile/core/config/client_config.dart';
 import 'package:groupnav_mobile/features/auth/models/auth_state.dart';
 import 'package:groupnav_mobile/features/auth/models/pilot_profile.dart';
 import 'package:groupnav_mobile/features/auth/providers/auth_provider.dart';
 import 'package:groupnav_mobile/features/auth/services/cognito_auth_service.dart';
+import 'package:groupnav_mobile/features/auth/widgets/forgot_password_dialog.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -118,5 +120,243 @@ void main() {
       expect(notifier.state.status, equals(AuthStatus.initial));
       expect(notifier.state.isAuthenticated, isFalse);
     });
+
+    test('sendPasswordResetCode validates email format before calling service', () async {
+      final mockService = _MockCognitoAuthService();
+      final notifier = AuthNotifier(mockService);
+
+      // Empty email
+      final result1 = await notifier.sendPasswordResetCode('');
+      expect(result1, isNull);
+      expect(mockService.forgotPasswordCalled, isFalse);
+      expect(notifier.state.passwordResetError, contains('valid pilot email'));
+
+      // Email missing @
+      final result2 = await notifier.sendPasswordResetCode('invalid-email');
+      expect(result2, isNull);
+      expect(mockService.forgotPasswordCalled, isFalse);
+    });
+
+    test('sendPasswordResetCode initiates recovery and sets destination', () async {
+      final mockService = _MockCognitoAuthService();
+      final notifier = AuthNotifier(mockService);
+
+      final result = await notifier.sendPasswordResetCode('pilot@groupnav.io');
+      expect(result, isNotNull);
+      expect(mockService.forgotPasswordCalled, isTrue);
+      expect(mockService.lastRequestedEmail, equals('pilot@groupnav.io'));
+      expect(notifier.state.passwordResetDestination, equals('p***@g***.io'));
+      expect(notifier.state.passwordResetError, isNull);
+      expect(notifier.state.resendCountdown, equals(60));
+    });
+
+    test('sendPasswordResetCode records error when Cognito service throws', () async {
+      final mockService = _MockCognitoAuthService()..shouldFail = true;
+      final notifier = AuthNotifier(mockService);
+
+      final result = await notifier.sendPasswordResetCode('nonexistent@groupnav.io');
+      expect(result, isNull);
+      expect(notifier.state.passwordResetError, contains('User does not exist'));
+      expect(notifier.state.isPasswordResetLoading, isFalse);
+    });
+
+    test('confirmPasswordReset validates code and password constraints', () async {
+      final mockService = _MockCognitoAuthService();
+      final notifier = AuthNotifier(mockService);
+
+      // Code too short
+      final shortCodeRes = await notifier.confirmPasswordReset(
+        email: 'pilot@groupnav.io',
+        code: '123',
+        newPassword: 'NewPassword123!',
+      );
+      expect(shortCodeRes, isFalse);
+      expect(mockService.confirmForgotPasswordCalled, isFalse);
+      expect(notifier.state.passwordResetError, contains('6-digit'));
+
+      // Password too short (< 8 chars)
+      final shortPassRes = await notifier.confirmPasswordReset(
+        email: 'pilot@groupnav.io',
+        code: '123456',
+        newPassword: 'short',
+      );
+      expect(shortPassRes, isFalse);
+      expect(mockService.confirmForgotPasswordCalled, isFalse);
+      expect(notifier.state.passwordResetError, contains('8 characters'));
+    });
+
+    test('confirmPasswordReset succeeds and updates password in state', () async {
+      final mockService = _MockCognitoAuthService();
+      final notifier = AuthNotifier(mockService);
+
+      final success = await notifier.confirmPasswordReset(
+        email: 'pilot@groupnav.io',
+        code: '654321',
+        newPassword: 'SecureNewPassword123!',
+      );
+
+      expect(success, isTrue);
+      expect(mockService.confirmForgotPasswordCalled, isTrue);
+      expect(mockService.lastSubmittedCode, equals('654321'));
+      expect(mockService.lastSubmittedPassword, equals('SecureNewPassword123!'));
+      expect(notifier.password, equals('SecureNewPassword123!'));
+      expect(notifier.state.passwordResetSuccess, isTrue);
+      expect(notifier.state.passwordResetError, isNull);
+    });
+
+    test('clearPasswordResetState resets transient password reset fields', () async {
+      final mockService = _MockCognitoAuthService();
+      final notifier = AuthNotifier(mockService);
+
+      await notifier.sendPasswordResetCode('pilot@groupnav.io');
+      expect(notifier.state.passwordResetDestination, isNotNull);
+
+      notifier.clearPasswordResetState();
+      expect(notifier.state.passwordResetDestination, isNull);
+      expect(notifier.state.passwordResetError, isNull);
+      expect(notifier.state.passwordResetSuccess, isFalse);
+    });
   });
+
+  group('ForgotPasswordDialog Widget Tests', () {
+    testWidgets('Renders stage 0 and advances to stage 1 on code send', (tester) async {
+      bool codeRequested = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ForgotPasswordDialog(
+              initialEmail: 'pilot@groupnav.io',
+              resendCountdown: 0,
+              onRequestCode: (email) async {
+                codeRequested = true;
+                return true;
+              },
+              onConfirmReset: ({required email, required code, required newPassword}) async => true,
+              onSuccess: (email, newPassword) {},
+              onCancel: () {},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Reset Account Password'), findsOneWidget);
+      expect(find.text('SEND CODE'), findsOneWidget);
+
+      await tester.tap(find.text('SEND CODE'));
+      await tester.pumpAndSettle();
+
+      expect(codeRequested, isTrue);
+      expect(find.text('Set New Password'), findsOneWidget);
+      expect(find.text('RESET PASSWORD & SIGN IN'), findsOneWidget);
+    });
+
+    testWidgets('Renders stage 1 with destination and completes reset to stage 2', (tester) async {
+      bool resetConfirmed = false;
+      bool successInvoked = false;
+      String? updatedEmail;
+      String? updatedPass;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ForgotPasswordDialog(
+              initialEmail: 'pilot@groupnav.io',
+              destination: 'p***@g***.io',
+              resendCountdown: 0,
+              onRequestCode: (email) async => true,
+              onConfirmReset: ({required email, required code, required newPassword}) async {
+                resetConfirmed = true;
+                return true;
+              },
+              onSuccess: (email, newPassword) {
+                successInvoked = true;
+                updatedEmail = email;
+                updatedPass = newPassword;
+              },
+              onCancel: () {},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Set New Password'), findsOneWidget);
+      expect(find.text('Code sent to: p***@g***.io'), findsOneWidget);
+
+      // Enter 6-digit code, password, confirm password
+      final textFields = find.byType(TextFormField);
+      await tester.enterText(textFields.at(0), '123456');
+      await tester.enterText(textFields.at(1), 'SecurePass123!');
+      await tester.enterText(textFields.at(2), 'SecurePass123!');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('RESET PASSWORD & SIGN IN'));
+      await tester.pumpAndSettle();
+
+      expect(resetConfirmed, isTrue);
+      expect(find.text('Password Reset Complete'), findsOneWidget);
+      expect(find.text('PROCEED TO SIGN IN'), findsOneWidget);
+
+      await tester.tap(find.text('PROCEED TO SIGN IN'));
+      await tester.pumpAndSettle();
+
+      expect(successInvoked, isTrue);
+      expect(updatedEmail, equals('pilot@groupnav.io'));
+      expect(updatedPass, equals('SecurePass123!'));
+    });
+  });
+}
+
+class _MockCognitoAuthService extends CognitoAuthService {
+  bool forgotPasswordCalled = false;
+  bool confirmForgotPasswordCalled = false;
+  String? lastRequestedEmail;
+  String? lastSubmittedCode;
+  String? lastSubmittedPassword;
+  bool shouldFail = false;
+  String failMessage = 'AWS Cognito [UserNotFoundException]: User does not exist.';
+
+  _MockCognitoAuthService()
+      : super(
+          config: const ClientConfig(
+            region: 'ap-south-1',
+            cognito: CognitoConfig(userPoolId: 'u', userPoolClientId: 'c', identityPoolId: 'i'),
+            location: LocationConfig(mapName: 'm', mapArn: 'a', geofenceCollectionName: 'g', geofenceCollectionArn: 'ga'),
+            iot: IotConfig(endpoint: 'e'),
+            network: NetworkConfig(vpcId: 'v', computeSecurityGroupId: 'csg', dataSecurityGroupId: 'dsg'),
+            data: DataConfig(redisEndpoint: 'r', auroraClusterEndpoint: 'a'),
+            compute: ComputeConfig(lambdaArn: 'l', dlqUrl: 'd', telemetryTopicPattern: 't'),
+            cicd: CicdConfig(pipelineName: 'p', pipelineArn: 'pa', gitHubConnectionArn: 'ga', artifactBucketName: 'b'),
+          ),
+          storage: MemoryAuthStorage(),
+        );
+
+  @override
+  Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    forgotPasswordCalled = true;
+    lastRequestedEmail = email;
+    if (shouldFail) {
+      throw Exception(failMessage);
+    }
+    return {
+      'destination': 'p***@g***.io',
+      'deliveryMedium': 'EMAIL',
+      'attributeName': 'email',
+    };
+  }
+
+  @override
+  Future<bool> confirmForgotPassword({
+    required String email,
+    required String confirmationCode,
+    required String newPassword,
+  }) async {
+    confirmForgotPasswordCalled = true;
+    lastSubmittedCode = confirmationCode;
+    lastSubmittedPassword = newPassword;
+    if (shouldFail) {
+      throw Exception(failMessage);
+    }
+    return true;
+  }
 }

@@ -7,6 +7,7 @@ import '../../settings/models/rider_settings.dart';
 import '../../settings/providers/settings_provider.dart';
 import '../models/convoy_peer.dart';
 import '../models/convoy_route.dart';
+import '../services/aws_location_route_service.dart';
 import '../services/iot_telemetry_service.dart';
 
 class RadarState {
@@ -25,6 +26,7 @@ class RadarState {
   final int broadcastCount;
   final DateTime? lastBroadcastTime;
   final bool isLeader;
+  final List<ConvoyRoute> customRoutes;
 
   const RadarState({
     this.peers = const [],
@@ -42,6 +44,7 @@ class RadarState {
     this.broadcastCount = 0,
     this.lastBroadcastTime,
     this.isLeader = true,
+    this.customRoutes = const [],
   });
 
   String get headingDisplay {
@@ -82,6 +85,7 @@ class RadarState {
     int? broadcastCount,
     DateTime? lastBroadcastTime,
     bool? isLeader,
+    List<ConvoyRoute>? customRoutes,
   }) {
     return RadarState(
       peers: peers ?? this.peers,
@@ -99,6 +103,7 @@ class RadarState {
       broadcastCount: broadcastCount ?? this.broadcastCount,
       lastBroadcastTime: lastBroadcastTime ?? this.lastBroadcastTime,
       isLeader: isLeader ?? this.isLeader,
+      customRoutes: customRoutes ?? this.customRoutes,
     );
   }
 }
@@ -149,6 +154,11 @@ final iotTelemetryServiceProvider = Provider<IotTelemetryService>((ref) {
   return service;
 });
 
+final awsLocationRouteServiceProvider = Provider<AwsLocationRouteService>((ref) {
+  final config = ref.watch(clientConfigProvider);
+  return AwsLocationRouteService(config: config);
+});
+
 final radarNotifierProvider = StateNotifierProvider<RadarNotifier, RadarState>((ref) {
   final telemetryService = ref.watch(iotTelemetryServiceProvider);
   return RadarNotifier(telemetryService);
@@ -177,9 +187,13 @@ class RadarNotifier extends StateNotifier<RadarState> {
   void _listenToRouteUpdates() {
     _telemetryService.routeUpdateStream.listen((route) {
       if (!mounted) return;
+      final updatedCustom = route.isCustom
+          ? [route, ...state.customRoutes.where((r) => r.id != route.id)]
+          : state.customRoutes;
       state = state.copyWith(
         activeRoute: route,
         routeWaypoints: route.waypoints,
+        customRoutes: updatedCustom,
       );
     });
   }
@@ -230,6 +244,19 @@ class RadarNotifier extends StateNotifier<RadarState> {
       routeWaypoints: route.waypoints,
     );
     if (broadcast) {
+      _telemetryService.broadcastRoute(route);
+    }
+  }
+
+  /// Add custom route, activate it, and optionally broadcast to pack
+  void addCustomRoute(ConvoyRoute route, {bool activate = true, bool broadcast = true}) {
+    final updatedCustom = [route, ...state.customRoutes.where((r) => r.id != route.id)];
+    state = state.copyWith(
+      customRoutes: updatedCustom,
+      activeRoute: activate ? route : state.activeRoute,
+      routeWaypoints: activate ? route.waypoints : state.routeWaypoints,
+    );
+    if (activate && broadcast) {
       _telemetryService.broadcastRoute(route);
     }
   }

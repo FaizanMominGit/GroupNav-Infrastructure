@@ -9,7 +9,11 @@
     "mapName": "GroupNavMap",
     "mapArn": "arn:aws:geo:ap-south-1:325313611329:map/GroupNavMap",
     "geofenceCollectionName": "GroupNavGeofenceCollection",
-    "geofenceCollectionArn": "arn:aws:geo:ap-south-1:325313611329:geofence-collection/GroupNavGeofenceCollection"
+    "geofenceCollectionArn": "arn:aws:geo:ap-south-1:325313611329:geofence-collection/GroupNavGeofenceCollection",
+    "routeCalculatorName": "GroupNavRouteCalculator",
+    "routeCalculatorArn": "arn:aws:geo:ap-south-1:325313611329:route-calculator/GroupNavRouteCalculator",
+    "placeIndexName": "GroupNavPlaceIndex",
+    "placeIndexArn": "arn:aws:geo:ap-south-1:325313611329:place-index/GroupNavPlaceIndex"
   },
   "iot": {
     "endpoint": "a362o0ub4ypzaj-ats.iot.ap-south-1.amazonaws.com"

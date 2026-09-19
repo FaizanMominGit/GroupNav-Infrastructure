@@ -232,6 +232,102 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(status: AuthStatus.initial, errorMessage: null);
   }
 
+  /// Request a password reset code for the specified email via AWS Cognito ForgotPassword API
+  Future<Map<String, dynamic>?> sendPasswordResetCode(String email) async {
+    final trimmedEmail = email.trim();
+    if (trimmedEmail.isEmpty || !trimmedEmail.contains('@')) {
+      state = state.copyWith(
+        passwordResetError: 'Please enter a valid pilot email address.',
+        isPasswordResetLoading: false,
+      );
+      return null;
+    }
+
+    state = state.copyWith(
+      isPasswordResetLoading: true,
+      passwordResetError: null,
+      passwordResetSuccess: false,
+    );
+
+    try {
+      final details = await _authService.forgotPassword(email: trimmedEmail);
+      _startResendTimer(60);
+      state = state.copyWith(
+        isPasswordResetLoading: false,
+        passwordResetDestination: details['destination'] as String? ?? trimmedEmail,
+        passwordResetError: null,
+      );
+      return details;
+    } catch (e) {
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      state = state.copyWith(
+        isPasswordResetLoading: false,
+        passwordResetError: msg,
+      );
+      return null;
+    }
+  }
+
+  /// Confirm password reset with the 6-digit email OTP and update the pilot password
+  Future<bool> confirmPasswordReset({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    final trimmedCode = code.trim();
+    if (trimmedCode.length != 6) {
+      state = state.copyWith(
+        passwordResetError: 'Please enter the 6-digit confirmation code.',
+        isPasswordResetLoading: false,
+      );
+      return false;
+    }
+
+    if (newPassword.length < 8) {
+      state = state.copyWith(
+        passwordResetError: 'Password must be at least 8 characters long.',
+        isPasswordResetLoading: false,
+      );
+      return false;
+    }
+
+    state = state.copyWith(
+      isPasswordResetLoading: true,
+      passwordResetError: null,
+    );
+
+    try {
+      await _authService.confirmForgotPassword(
+        email: email.trim(),
+        confirmationCode: trimmedCode,
+        newPassword: newPassword,
+      );
+
+      _password = newPassword;
+      _countdownTimer?.cancel();
+
+      state = state.copyWith(
+        isPasswordResetLoading: false,
+        passwordResetSuccess: true,
+        passwordResetError: null,
+        resendCountdown: 0,
+      );
+      return true;
+    } catch (e) {
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      state = state.copyWith(
+        isPasswordResetLoading: false,
+        passwordResetError: msg,
+      );
+      return false;
+    }
+  }
+
+  /// Clear password reset transient state
+  void clearPasswordResetState() {
+    state = state.clearPasswordReset();
+  }
+
   Future<void> signOut() async {
     _countdownTimer?.cancel();
     await _authService.signOut();

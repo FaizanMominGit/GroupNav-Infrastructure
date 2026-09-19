@@ -15,7 +15,7 @@ Current status indicator:
 - [x] **Email Verification / Confirmation Code**: 6-digit confirmation code verification flow during pilot registration.
 - [x] **Guest / Skip / Offline Ride Mode**: Allow riders to enter the app and ride immediately in solo mode without requiring an active account.
 - [x] **Callsign & Pilot Identity**: Rider handles/callsigns (e.g. `GhostRider`, `Maverick`) linked to session state.
-- [ ] **Password Reset & Recovery**: "Forgot Password" flow with email OTP and new password submission.
+- [x] **Password Reset & Recovery**: "Forgot Password" flow with email OTP and new password submission.
 - [ ] **Biometric Unlock**: Face ID and Fingerprint authentication for fast, one-touch login with motorcycle gear.
 - [ ] **Social & Web3 Auth**:
   - Sign in with Google / Apple for one-tap sign-in.
@@ -57,6 +57,11 @@ Current status indicator:
 - [x] **Follower Route Lock Protection**: Followers' navigation courses are locked to the Road Captain's route and update automatically without polling.
 - [x] **Curated Tactical Route Catalog**: Route library with distance, duration, elevation gain, difficulty levels, and recommended formations.
 - [x] **Live Telemetry & Broadcast Metrics Pill**: Heads-up status bar showing live AWS IoT MQTT connection, packet counts, and hardware GPS fix.
+- [~] **Dynamic Custom Route Builder (Amazon Location Service)**:
+  - Multi-stop route construction: Start/Origin (with one-tap Current GPS fix), Destination, and dynamic intermediate stops (Regroup, Fuel, Scenic, Meetup).
+  - Real road-following routing via **Amazon Location Service Routes (`CalculateRoute`)** with commercial Esri cartography.
+  - Landmark, town, and place search powered by **Amazon Location Service Places (`SearchPlaceIndexForText`)**.
+  - Tactical course dispatch synchronizing the custom route to all pack members over **AWS IoT Core MQTT**.
 - [ ] **Camera Centering & View Modes**:
   - **Follow Me**: Keeps user centered in direction of travel (Head-Up).
   - **Fit Pack**: Auto-zooms to keep all active convoy members on screen at once.

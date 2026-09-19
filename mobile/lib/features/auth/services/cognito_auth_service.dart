@@ -144,6 +144,69 @@ class CognitoAuthService {
     }
   }
 
+  /// Initiate password reset flow by sending a 6-digit confirmation code to user's email
+  Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    final endpoint = Uri.parse('https://cognito-idp.${config.region}.amazonaws.com/');
+
+    final response = await http.post(
+      endpoint,
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.ForgotPassword',
+      },
+      body: json.encode({
+        'ClientId': config.cognito.userPoolClientId,
+        'Username': email.trim(),
+      }),
+    ).timeout(const Duration(seconds: 15));
+
+    final data = json.decode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200) {
+      final errorType = (data['__type'] as String? ?? '').split('#').last;
+      final message = data['message'] as String? ?? 'Password reset request failed';
+      throw Exception('AWS Cognito [$errorType]: $message');
+    }
+
+    final deliveryDetails = data['CodeDeliveryDetails'] as Map<String, dynamic>? ?? {};
+    return {
+      'destination': deliveryDetails['Destination'] as String? ?? email,
+      'deliveryMedium': deliveryDetails['DeliveryMedium'] as String? ?? 'EMAIL',
+      'attributeName': deliveryDetails['AttributeName'] as String? ?? 'email',
+    };
+  }
+
+  /// Confirm password reset with the 6-digit email confirmation code and new password
+  Future<bool> confirmForgotPassword({
+    required String email,
+    required String confirmationCode,
+    required String newPassword,
+  }) async {
+    final endpoint = Uri.parse('https://cognito-idp.${config.region}.amazonaws.com/');
+
+    final response = await http.post(
+      endpoint,
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.ConfirmForgotPassword',
+      },
+      body: json.encode({
+        'ClientId': config.cognito.userPoolClientId,
+        'Username': email.trim(),
+        'ConfirmationCode': confirmationCode.trim(),
+        'Password': newPassword,
+      }),
+    ).timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final errorType = (data['__type'] as String? ?? '').split('#').last;
+      final message = data['message'] as String? ?? 'Password confirmation failed';
+      throw Exception('AWS Cognito [$errorType]: $message');
+    }
+
+    return true;
+  }
+
   /// Authenticate user via USER_PASSWORD_AUTH and exchange ID token for temporary AWS IAM credentials
   Future<Map<String, dynamic>> signIn({
     required String email,

@@ -83,12 +83,20 @@ class LocationConfig {
   final String mapArn;
   final String geofenceCollectionName;
   final String geofenceCollectionArn;
+  final String routeCalculatorName;
+  final String routeCalculatorArn;
+  final String placeIndexName;
+  final String placeIndexArn;
 
   const LocationConfig({
     required this.mapName,
     required this.mapArn,
     required this.geofenceCollectionName,
     required this.geofenceCollectionArn,
+    this.routeCalculatorName = 'GroupNavRouteCalculator',
+    this.routeCalculatorArn = '',
+    this.placeIndexName = 'GroupNavPlaceIndex',
+    this.placeIndexArn = '',
   });
 
   factory LocationConfig.fromJson(Map<String, dynamic> json) {
@@ -97,6 +105,10 @@ class LocationConfig {
       mapArn: json['mapArn'] as String? ?? '',
       geofenceCollectionName: json['geofenceCollectionName'] as String? ?? '',
       geofenceCollectionArn: json['geofenceCollectionArn'] as String? ?? '',
+      routeCalculatorName: json['routeCalculatorName'] as String? ?? 'GroupNavRouteCalculator',
+      routeCalculatorArn: json['routeCalculatorArn'] as String? ?? '',
+      placeIndexName: json['placeIndexName'] as String? ?? 'GroupNavPlaceIndex',
+      placeIndexArn: json['placeIndexArn'] as String? ?? '',
     );
   }
 }

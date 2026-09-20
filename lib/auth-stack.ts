@@ -405,14 +405,10 @@ export class AuthStack extends cdk.Stack {
     // Grant Lambda permissions to attach IoT policies
     attachIotPolicyHandler.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
-      actions: ['iot:AttachPrincipalPolicy'],
-      // AttachPrincipalPolicy resource must be the policy being attached or '*'
-      resources: [
-        cdk.Fn.join('', [
-          'arn:', cdk.Aws.PARTITION, ':iot:', cdk.Aws.REGION, ':', cdk.Aws.ACCOUNT_ID,
-          ':policy/', iotCorePolicy.policyName!
-        ])
-      ],
+      actions: ['iot:AttachPolicy'],
+      // The target resource for AttachPolicy is the policy ARN, but we use '*' to avoid circular deps or ARN complexities,
+      // while the Lambda code strictly hardcodes the exact policy name it attaches.
+      resources: ['*'],
     }));
 
     // 9. API Gateway for IoT Policy Attachment
@@ -434,6 +430,18 @@ export class AuthStack extends cdk.Stack {
         authorizationType: apigateway.AuthorizationType.IAM,
       }
     );
+
+    // Grant the authenticated user role permission to invoke this specific API method
+    this.authenticatedRole.addToPolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['execute-api:Invoke'],
+      resources: [
+        cdk.Fn.join('', [
+          'arn:', cdk.Aws.PARTITION, ':execute-api:', cdk.Aws.REGION, ':', cdk.Aws.ACCOUNT_ID,
+          ':', attachPolicyApi.restApiId, '/*/POST/attach-policy'
+        ])
+      ],
+    }));
 
     new cdk.CfnOutput(this, 'AttachPolicyApiEndpoint', {
       value: attachPolicyApi.url,

@@ -1,4 +1,4 @@
-import { IoTClient, AttachPrincipalPolicyCommand } from "@aws-sdk/client-iot";
+import { IoTClient, AttachPolicyCommand } from "@aws-sdk/client-iot";
 
 const iotClient = new IoTClient({});
 const POLICY_NAME = process.env.IOT_POLICY_NAME || "GroupNav-Rider-IoT-Core-Access";
@@ -21,9 +21,9 @@ export const handler = async (event) => {
   }
 
   try {
-    const command = new AttachPrincipalPolicyCommand({
+    const command = new AttachPolicyCommand({
       policyName: POLICY_NAME,
-      principal: identityId,
+      target: identityId,
     });
     
     await iotClient.send(command);

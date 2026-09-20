@@ -177,7 +177,6 @@ class AwsLocationRouteService {
 
           final distanceKm = (summary['Distance'] as num?)?.toDouble() ?? 0.0;
           final durationSec = (summary['DurationSeconds'] as num?)?.toDouble() ?? 0.0;
-
           final routeWaypoints = <LatLng>[];
           for (final leg in legs) {
             final legMap = leg as Map<String, dynamic>;
@@ -191,8 +190,21 @@ class AwsLocationRouteService {
             }
           }
 
-          if (routeWaypoints.isNotEmpty) {
-            debugPrint('[AWS Location Routes] SUCCESS: ${routeWaypoints.length} road waypoints, ${distanceKm.toStringAsFixed(1)} km, ${(durationSec / 60).round()} mins');
+          var finalWaypoints = routeWaypoints;
+          if (finalWaypoints.length > 250) {
+            final step = (finalWaypoints.length / 250).ceil();
+            final downsampled = <LatLng>[];
+            for (var i = 0; i < finalWaypoints.length; i += step) {
+              downsampled.add(finalWaypoints[i]);
+            }
+            if (downsampled.last != finalWaypoints.last) {
+              downsampled.add(finalWaypoints.last);
+            }
+            finalWaypoints = downsampled;
+          }
+
+          if (finalWaypoints.isNotEmpty) {
+            debugPrint('[AWS Location Routes] SUCCESS: ${finalWaypoints.length} road waypoints (downsampled from ${routeWaypoints.length}), ${distanceKm.toStringAsFixed(1)} km, ${(durationSec / 60).round()} mins');
             return ConvoyRoute(
               id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
               title: title,
@@ -203,7 +215,7 @@ class AwsLocationRouteService {
               elevationGainMeters: (distanceKm * 18).clamp(80, 1500).round(),
               recommendedFormation: recommendedFormation,
               difficultyLevel: distanceKm > 80 ? 'ADVANCED' : 'MODERATE',
-              waypoints: routeWaypoints,
+              waypoints: finalWaypoints,
               stops: stops,
               isCustom: true,
             );

@@ -186,6 +186,7 @@ final radarNotifierProvider = StateNotifierProvider<RadarNotifier, RadarState>((
 
 class RadarNotifier extends StateNotifier<RadarState> {
   final IotTelemetryService _telemetryService;
+  void Function(ConvoyRoute route)? onRouteBroadcast;
 
   RadarNotifier(this._telemetryService)
       : super(const RadarState()) {
@@ -262,6 +263,7 @@ class RadarNotifier extends StateNotifier<RadarState> {
     );
     if (broadcast) {
       _telemetryService.broadcastRoute(route);
+      onRouteBroadcast?.call(route);
     }
   }
 
@@ -275,6 +277,7 @@ class RadarNotifier extends StateNotifier<RadarState> {
     );
     if (activate && broadcast) {
       _telemetryService.broadcastRoute(route);
+      onRouteBroadcast?.call(route);
     }
   }
 

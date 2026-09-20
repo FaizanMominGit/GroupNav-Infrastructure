@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../radar/models/convoy_route.dart';
 import '../../radar/providers/radar_provider.dart';
 import '../../radar/services/iot_telemetry_service.dart';
 import '../models/pack_formation.dart';
@@ -46,6 +47,9 @@ class PackNotifier extends StateNotifier<PackFormation> {
     this._qrScannerService,
   ]) : super(_soloFormation()) {
     _initRiderIdentity();
+    _radarNotifier?.onRouteBroadcast = (route) {
+      syncRouteToDynamoDb(route);
+    };
   }
 
   static PackFormation _soloFormation([String callsign = 'Pilot']) {
@@ -123,6 +127,9 @@ class PackNotifier extends StateNotifier<PackFormation> {
             if (restored != null && mounted) {
               state = restored.copyWith(isInPack: true);
               _radarNotifier?.updateGeofenceRadius(restored.geofenceRadiusMeters);
+              if (restored.activeRoute != null) {
+                _radarNotifier?.setRoute(restored.activeRoute!, broadcast: false);
+              }
               _telemetryService?.updateActivePack(restored.packCode);
               _startRosterPolling(restored.packCode);
               debugPrint('[PackNotifier] Restored active pack room: $savedCode from DynamoDB');
@@ -453,6 +460,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
     final riderId = pilot?.cognitoIdentityId ?? 'rider-$randomNum';
     final callsign = pilot?.callsign ?? 'Captain';
     final vehicleClass = pilot?.vehicleClass ?? 'SPORT';
+    final initialRoute = _radarNotifier?.state.activeRoute;
 
     final formation = await _packService.createPack(
       packCode: code,
@@ -462,6 +470,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
       bikeModel: vehicleClass,
       geofenceRadiusMeters: effectiveRadius,
       formationType: formationType,
+      activeRoute: initialRoute,
       awsCredentials: creds,
     );
 
@@ -526,6 +535,10 @@ class PackNotifier extends StateNotifier<PackFormation> {
     );
 
     state = formation.copyWith(isInPack: true);
+    if (formation.activeRoute != null) {
+      _radarNotifier?.setRoute(formation.activeRoute!, broadcast: false);
+      debugPrint('[PackNotifier] Applied active pack route ${formation.activeRoute?.title} from DynamoDB upon join');
+    }
     _telemetryService?.updateActivePack(formation.packCode);
     await _safeStorageWrite(_activePackKey, formation.packCode);
     _startRosterPolling(cleanCode);
@@ -547,9 +560,34 @@ class PackNotifier extends StateNotifier<PackFormation> {
         );
         if (latest != null && mounted) {
           state = latest.copyWith(isInPack: true);
+          if (latest.activeRoute != null &&
+              latest.activeRoute?.id != _radarNotifier?.state.activeRoute?.id) {
+            _radarNotifier?.setRoute(latest.activeRoute!, broadcast: false);
+            debugPrint('[PackNotifier] Received new route update ${latest.activeRoute?.title} via DynamoDB roster poll');
+          }
         }
       } catch (_) {}
     });
+  }
+
+  /// Persist active navigation route to AWS DynamoDB
+  Future<void> syncRouteToDynamoDb(ConvoyRoute? route) async {
+    state = state.copyWith(activeRoute: route, clearRoute: route == null);
+    if (!state.isInPack || state.packCode.isEmpty || _ref == null || _packService == null) return;
+    final auth = _ref.read(authNotifierProvider);
+    final creds = auth.awsCredentials;
+    if (creds == null) return;
+
+    try {
+      await _packService.updatePackRoute(
+        packCode: state.packCode,
+        route: route,
+        awsCredentials: creds,
+      );
+      debugPrint('[PackNotifier] Successfully synced active route ${route?.title} to DynamoDB pack ${state.packCode}');
+    } catch (e) {
+      debugPrint('[PackNotifier] Error persisting active route to DynamoDB: $e');
+    }
   }
 
   @override

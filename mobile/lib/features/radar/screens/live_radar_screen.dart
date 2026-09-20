@@ -183,6 +183,20 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
       });
     }
 
+    // Auto-center map when active route changes
+    ref.listen(radarNotifierProvider.select((state) => state.activeRoute), (previous, next) {
+      if (next != null && next.waypoints.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _mapController.fitCamera(CameraFit.bounds(
+              bounds: LatLngBounds.fromPoints(next.waypoints),
+              padding: const EdgeInsets.all(80.0),
+            ));
+          }
+        });
+      }
+    });
+
     // Auto-center map on first real GPS lock
     if (!_hasCenteredOnGps &&
         radarState.centerPosition.latitude != 0.0 &&
@@ -333,7 +347,7 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
                   ...radarState.peers.map((peer) {
                     return Marker(
                       point: LatLng(peer.latitude, peer.longitude),
-                      width: peer.isLeader ? 150 : 120,
+                      width: peer.isLeader ? 180 : 160,
                       height: peer.isLeader ? 84 : 68,
                       child: ConvoyMarkerWidget(peer: peer),
                     );

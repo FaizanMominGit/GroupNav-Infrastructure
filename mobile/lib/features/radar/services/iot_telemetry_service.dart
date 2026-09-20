@@ -83,24 +83,11 @@ class IotTelemetryService {
 
   void updateActivePack(String packCode) {
     if (_activePackCode == packCode) return;
-    final previousPack = _activePackCode;
     _activePackCode = packCode;
 
     // Clear remote peers from previous pack
     _activePeers.removeWhere((id, _) => id != _currentRiderId);
     _emitPeers();
-
-    // Re-subscribe if connected
-    if (_mqttClient != null && _isMqttConnected) {
-      if (previousPack.isNotEmpty) {
-        _mqttClient!.unsubscribe('groupnav/packs/$previousPack/telemetry');
-        _mqttClient!.unsubscribe('groupnav/packs/$previousPack/alerts');
-      }
-      if (_activePackCode.isNotEmpty) {
-        _mqttClient!.subscribe('groupnav/packs/$_activePackCode/telemetry', MqttQos.atLeastOnce);
-        _mqttClient!.subscribe('groupnav/packs/$_activePackCode/alerts', MqttQos.atLeastOnce);
-      }
-    }
   }
 
   bool _isConnecting = false;
@@ -177,17 +164,18 @@ class IotTelemetryService {
         _connectionStatusController.add(true);
         debugPrint('[IotTelemetryService] AWS IoT Core MQTT connected successfully.');
 
-        // Subscribe to global and pack-specific telemetry and alerts
+        // Subscribe to global and pack-specific telemetry and alerts with wildcards
         client.subscribe('groupnav/+/telemetry', MqttQos.atLeastOnce);
-        if (_activePackCode.isNotEmpty) {
-          client.subscribe('groupnav/packs/$_activePackCode/telemetry', MqttQos.atLeastOnce);
-          client.subscribe('groupnav/packs/$_activePackCode/alerts', MqttQos.atLeastOnce);
-        }
+        client.subscribe('groupnav/packs/+/telemetry', MqttQos.atLeastOnce);
+        client.subscribe('groupnav/packs/+/alerts', MqttQos.atLeastOnce);
+        client.subscribe('groupnav/+/routes', MqttQos.atLeastOnce);
+        client.subscribe('groupnav/packs/+/routes', MqttQos.atLeastOnce);
 
         client.updates?.listen((List<MqttReceivedMessage<MqttMessage>> messages) {
           for (final msg in messages) {
             final recMess = msg.payload as MqttPublishMessage;
             final payloadStr = MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
+            debugPrint('[IotTelemetryService] RAW RECV: topic=${msg.topic} payload=$payloadStr');
 
             try {
               final jsonMap = jsonDecode(payloadStr) as Map<String, dynamic>;
@@ -197,7 +185,9 @@ class IotTelemetryService {
               } else if (msg.topic.contains('/telemetry')) {
                 _handleIncomingTelemetry(jsonMap);
               }
-            } catch (_) {}
+            } catch (e, stack) {
+              debugPrint('[IotTelemetryService] Error processing incoming MQTT message: $e\n$stack');
+            }
           }
         });
 
@@ -232,7 +222,7 @@ class IotTelemetryService {
       }
 
       final packet = TelemetryPacket.fromJson(data);
-      if (packet.riderId == _currentRiderId) return; // Skip self
+      if (packet.callsign == _currentCallsign) return; // Skip self
 
       final remotePeer = ConvoyPeer(
         callsign: packet.callsign,
@@ -247,9 +237,11 @@ class IotTelemetryService {
         monikerTag: data['isLeader'] == true ? 'Lead' : 'Rider',
       );
 
-      _activePeers[packet.riderId] = remotePeer;
+      _activePeers[packet.callsign] = remotePeer;
       _emitPeers();
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('[IotTelemetryService] Error in _handleIncomingTelemetry: $e\n$stack');
+    }
   }
 
   void setBroadcasting(bool value) {
@@ -275,8 +267,8 @@ class IotTelemetryService {
         monikerTag: _isLeader ? 'Lead' : 'Rider',
       );
 
-      final effectiveRiderId = _currentRiderId.isNotEmpty ? _currentRiderId : 'self';
-      _activePeers[effectiveRiderId] = selfPeer;
+      final effectiveCallsign = displayCallsign;
+      _activePeers[effectiveCallsign] = selfPeer;
       _emitPeers();
 
       if (_isBroadcasting && _isMqttConnected) {

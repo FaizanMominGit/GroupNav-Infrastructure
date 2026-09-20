@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/client_config.dart';
 import '../../../core/services/aws_sigv4_signer.dart';
+import '../../radar/models/convoy_route.dart';
 import '../models/pack_formation.dart';
 import '../models/pack_member.dart';
 
@@ -29,6 +30,7 @@ class DynamoDbPackService {
     required String bikeModel,
     double geofenceRadiusMeters = 800.0,
     String formationType = 'STAGGERED',
+    ConvoyRoute? activeRoute,
     required Map<String, String> awsCredentials,
   }) async {
     final hostMember = {
@@ -48,23 +50,29 @@ class DynamoDbPackService {
       }
     };
 
+    final itemMap = <String, dynamic>{
+      'packCode': {'S': packCode},
+      'packId': {'S': packCode.replaceAll(RegExp(r'[^0-9]'), '')},
+      'title': {'S': title},
+      'hostRiderId': {'S': hostRiderId},
+      'formationType': {'S': formationType},
+      'geofenceRadiusMeters': {'N': geofenceRadiusMeters.toString()},
+      'isLocked': {'BOOL': false},
+      'status': {'S': 'active'},
+      'createdAt': {'N': DateTime.now().millisecondsSinceEpoch.toString()},
+      'updatedAt': {'N': DateTime.now().millisecondsSinceEpoch.toString()},
+      'members': {
+        'L': [hostMember],
+      },
+    };
+
+    if (activeRoute != null) {
+      itemMap['activeRouteJson'] = {'S': jsonEncode(activeRoute.toJson())};
+    }
+
     final body = json.encode({
       'TableName': _tableName,
-      'Item': {
-        'packCode': {'S': packCode},
-        'packId': {'S': packCode.replaceAll(RegExp(r'[^0-9]'), '')},
-        'title': {'S': title},
-        'hostRiderId': {'S': hostRiderId},
-        'formationType': {'S': formationType},
-        'geofenceRadiusMeters': {'N': geofenceRadiusMeters.toString()},
-        'isLocked': {'BOOL': false},
-        'status': {'S': 'active'},
-        'createdAt': {'N': DateTime.now().millisecondsSinceEpoch.toString()},
-        'updatedAt': {'N': DateTime.now().millisecondsSinceEpoch.toString()},
-        'members': {
-          'L': [hostMember],
-        },
-      },
+      'Item': itemMap,
     });
 
     final headers = _signer.signHttpRequest(
@@ -112,6 +120,7 @@ class DynamoDbPackService {
           isCurrentUser: true,
         ),
       ],
+      activeRoute: activeRoute,
     );
   }
 
@@ -473,6 +482,17 @@ class DynamoDbPackService {
     final hostRiderId = item['hostRiderId']?['S'] as String? ?? '';
     final status = item['status']?['S'] as String? ?? 'active';
 
+    ConvoyRoute? activeRoute;
+    final activeRouteJsonStr = item['activeRouteJson']?['S'] as String?;
+    if (activeRouteJsonStr != null && activeRouteJsonStr.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(activeRouteJsonStr) as Map<String, dynamic>;
+        activeRoute = ConvoyRoute.fromJson(decoded);
+      } catch (e) {
+        debugPrint('[DynamoDbPackService] Failed to parse activeRouteJson: $e');
+      }
+    }
+
     return PackFormation(
       packId: packId,
       packCode: packCode,
@@ -485,6 +505,7 @@ class DynamoDbPackService {
       isLocked: isLocked,
       hostRiderId: hostRiderId,
       status: status,
+      activeRoute: activeRoute,
     );
   }
 
@@ -604,6 +625,58 @@ class DynamoDbPackService {
     );
 
     await http.post(_endpoint, headers: headers, body: body).timeout(const Duration(seconds: 10));
+  }
+
+  /// Update or clear the pack's active navigation route on AWS DynamoDB
+  Future<void> updatePackRoute({
+    required String packCode,
+    required ConvoyRoute? route,
+    required Map<String, String> awsCredentials,
+  }) async {
+    final updateExpr = route != null
+        ? 'SET #route = :route, #updatedAt = :now'
+        : 'REMOVE #route SET #updatedAt = :now';
+    final exprNames = {
+      '#route': 'activeRouteJson',
+      '#updatedAt': 'updatedAt',
+    };
+    final exprValues = <String, dynamic>{
+      ':now': {'N': DateTime.now().millisecondsSinceEpoch.toString()},
+    };
+    if (route != null) {
+      exprValues[':route'] = {'S': jsonEncode(route.toJson())};
+    }
+
+    final body = json.encode({
+      'TableName': _tableName,
+      'Key': {
+        'packCode': {'S': packCode},
+      },
+      'UpdateExpression': updateExpr,
+      'ExpressionAttributeNames': exprNames,
+      'ExpressionAttributeValues': exprValues,
+    });
+
+    final headers = _signer.signHttpRequest(
+      method: 'POST',
+      path: '/',
+      service: 'dynamodb',
+      host: _dynamoHost,
+      target: 'DynamoDB_20120810.UpdateItem',
+      body: body,
+      accessKeyId: awsCredentials['AccessKeyId']!,
+      secretKey: awsCredentials['SecretKey']!,
+      sessionToken: awsCredentials['SessionToken'],
+    );
+
+    final response = await http.post(_endpoint, headers: headers, body: body)
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode != 200) {
+      final err = _parseError(response.body);
+      throw Exception('AWS DynamoDB UpdatePackRoute Error: $err');
+    }
+    debugPrint('[DynamoDbPackService] Updated pack $packCode active route on AWS DynamoDB.');
   }
 
   String _extractInitials(String name) {

@@ -1,3 +1,4 @@
+import '../../radar/models/convoy_route.dart';
 import 'pack_member.dart';
 
 class PackFormation {
@@ -12,6 +13,7 @@ class PackFormation {
   final bool isLocked;
   final String hostRiderId;
   final String status;
+  final ConvoyRoute? activeRoute;
 
   const PackFormation({
     this.packId = '',
@@ -25,6 +27,7 @@ class PackFormation {
     this.isLocked = false,
     this.hostRiderId = '',
     this.status = 'active',
+    this.activeRoute,
   });
 
   String get shareLink => 'https://groupnav.app/join/$packCode';
@@ -81,6 +84,8 @@ class PackFormation {
     bool? isLocked,
     String? hostRiderId,
     String? status,
+    ConvoyRoute? activeRoute,
+    bool clearRoute = false,
   }) {
     return PackFormation(
       packId: packId ?? this.packId,
@@ -94,6 +99,7 @@ class PackFormation {
       isLocked: isLocked ?? this.isLocked,
       hostRiderId: hostRiderId ?? this.hostRiderId,
       status: status ?? this.status,
+      activeRoute: clearRoute ? null : (activeRoute ?? this.activeRoute),
     );
   }
 }

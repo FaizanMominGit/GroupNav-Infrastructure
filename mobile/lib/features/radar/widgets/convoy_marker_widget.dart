@@ -124,7 +124,13 @@ class ConvoyMarkerWidget extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('${peer.callsign}:', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.w600)),
+              Flexible(
+                child: Text(
+                  '${peer.callsign}:',
+                  style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
               const SizedBox(width: 3),
               Text(peer.offsetFormatted, style: AppTypography.labelSm.copyWith(color: badgeColor, fontWeight: FontWeight.w700)),
             ],

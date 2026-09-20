@@ -936,3 +936,29 @@ When an issue, error, or unexpected behavior is encountered, document it using t
   - Live screenshot on Realme hardware confirmed `• SOLO 1 Rider`, clean top bar, and removal of the "Hardware GPS Fix" badge.
 - **Prevention Rule**:
   Always verify peer collection semantics (whether self is included or excluded) across domain models to avoid off-by-one errors. Ensure UI header widgets bind to the unified resolved user profile rather than uninitialized sub-notifiers.
+
+---
+
+### [ISSUE-035] Active Route Lost for Late-Joining Riders & MQTT Exceeded Payload Disconnect
+- **Date & Phase**: 2026-09-20 | Multi-Rider Device Integration & Convoy Route Sync
+- **Component / Command**: `PackFormation`, `DynamoDbPackService`, `pack_provider.dart`, `radar_provider.dart`, `aws_location_route_service.dart`, `live_radar_screen.dart`
+- **Symptom / Error Message**:
+  1. Convoy Leader created or selected a route, but a second device joining the pack room afterward could not see the route on their radar screen.
+  2. For large custom routes with extensive GPS waypoints, AWS IoT Core disconnected abruptly upon route broadcast with MQTT payload size violation (>128 KB limit).
+  3. Followers receiving a route update had their radar map centered on old coordinates rather than framing the full navigation path.
+- **Root Cause Analysis**:
+  1. Routes were previously transmitted purely via ephemeral MQTT messages (`action: 'route_change'`). There was zero persistence in DynamoDB, meaning any rider joining after the broadcast missed the route completely.
+  2. AWS Location Service routes over complex paths generated over 1,500 coordinates, pushing the JSON payload past AWS IoT Core's strict 128 KB message limit.
+  3. Map viewport had no automated boundary fitting (`fitCamera`) when an external route update arrived.
+- **Fix / Solution Applied**:
+  1. Downsampled route waypoints to a maximum of 250 evenly spaced points in `AwsLocationRouteService` if waypoint count exceeded limits, guaranteeing sub-30KB payloads.
+  2. Added automated auto-pan / boundary-fit logic (`_fitRouteInView`) in `LiveRadarScreen` listening to `activeRoute` changes.
+  3. Extended `PackFormation` model to store `final ConvoyRoute? activeRoute`.
+  4. Implemented `updatePackRoute` in `DynamoDbPackService` using SigV4-signed DynamoDB `UpdateItem` (`activeRouteJson` attribute) and parsed it in `_parsePackItem`.
+  5. Wired dual-channel synchronization: `RadarNotifier` invokes `onRouteBroadcast` on leader route selection, saving to DynamoDB via `PackNotifier.syncRouteToDynamoDb()`. Followers automatically pull and display `activeRoute` on `joinPack()`, app session restore (`_restoreSavedPack`), and periodic roster polling.
+- **Verification**:
+  - `flutter analyze` &rarr; No issues found (ran in 34.0s).
+  - Built debug APK and installed on physical hardware with zero errors.
+  - Verified DynamoDB schemaless attribute persistence and cross-device recovery.
+- **Prevention Rule**:
+  Never rely solely on ephemeral pub/sub broadcasts for state that late joiners or reconnecting clients need. Always back shared state with an authoritative persistent datastore (DynamoDB) and use pub/sub as a low-latency cache invalidator/notifier.

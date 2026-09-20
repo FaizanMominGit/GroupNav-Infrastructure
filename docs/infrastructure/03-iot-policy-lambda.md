@@ -10,12 +10,16 @@
 
 ## 2. Why It Was Done This Way
 - **Requirement for Connection**: AWS IoT Core enforces that Cognito Identities (even when mapped to an IAM Role) must explicitly have an IoT Policy attached to their specific Principal ID before they can connect via MQTT over WebSockets. Failure to do so results in silent TCP disconnects and HTTP 403 Forbidden errors.
-- **Why API Gateway + Lambda**: Cognito does not automatically attach IoT policies to new users when they sign up. The most secure architectural pattern for dynamic attachment is routing the client through an IAM-secured API Gateway proxying to a Lambda function which has the `iot:AttachPrincipalPolicy` permission.
+- **Why API Gateway + Lambda**: Cognito does not automatically attach IoT policies to new users when they sign up. The most secure architectural pattern for dynamic attachment is routing the client through an IAM-secured API Gateway proxying to a Lambda function which has the `iot:AttachPolicy` permission.
 - **Why IAM Auth**: Since the client has temporary AWS credentials obtained from the Cognito Identity Pool, SigV4 signing the request allows API Gateway to inherently validate the caller and inject the user's secure Cognito Identity ID into the proxy event, preventing spoofing and removing the need for a custom authorizer or JWT validation.
+
+### Critical Implementation Details (Bug Fixes)
+1. **API Gateway Invocation Privileges**: It was discovered that the Cognito Authenticated Role must be explicitly granted `execute-api:Invoke` permissions targeting the API Gateway ARN, or else API Gateway returns a `403 Forbidden` error. This was added to `auth-stack.ts`.
+2. **IAM Action Deprecation**: The legacy `AttachPrincipalPolicyCommand` (which uses the `iot:AttachPrincipalPolicy` IAM action) is deprecated and silently rejected by modern SDKs, throwing a `500 Internal Server Error` due to an IAM policy failure on the dynamic Principal resource. It was replaced with the modern `AttachPolicyCommand` using the `iot:AttachPolicy` IAM action, which successfully resolved the issue.
 
 ## 3. Verification Evidence
 - Successfully deployed `AuthStack` containing the API Gateway and Lambda (Deployment Time: ~61s).
 - Obtained the API Gateway Endpoint: `https://j9tlu1hzc7.execute-api.ap-south-1.amazonaws.com/prod/`.
 - Confirmed the Lambda code was bundled natively without needing a `package.json` since `@aws-sdk/client-iot` is included in the AWS Lambda runtime for Node 20.x.
-- Mobile client configuration successfully updated.
+- Mobile client testing confirmed successful SigV4 signing, API proxy, Lambda execution, and subsequent MQTT WebSocket connection.
 

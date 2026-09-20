@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/config/client_config.dart';
 import '../models/auth_state.dart';
@@ -121,14 +122,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final savedPilot = await _authService.restoreSession();
       if (savedPilot != null) {
         _callsign = savedPilot.callsign;
-        final creds = await _authService.getCachedCredentials();
+        var creds = await _authService.getCachedCredentials();
+
+        // Silently refresh STS credentials if they are expired or about to expire
+        if (_authService.areCredentialsExpired(creds)) {
+          debugPrint('[AuthNotifier] Cached AWS credentials expired — refreshing via stored refresh token...');
+          final refreshed = await _authService.refreshAwsCredentials();
+          if (refreshed != null) {
+            creds = refreshed;
+            debugPrint('[AuthNotifier] Credentials refreshed successfully on session restore.');
+          } else {
+            debugPrint('[AuthNotifier] Credential refresh failed — user will need to re-login for MQTT to work.');
+          }
+        } else {
+          debugPrint('[AuthNotifier] Cached AWS credentials are still valid.');
+        }
+
         state = state.copyWith(
           status: AuthStatus.authenticated,
           pilot: savedPilot,
           awsCredentials: creds,
         );
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[AuthNotifier] checkSavedSession error: $e');
+    }
   }
 
   /// Check whether biometric authentication can be offered on device

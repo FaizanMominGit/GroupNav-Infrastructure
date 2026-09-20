@@ -52,8 +52,10 @@ export async function handler(event: IoTEvent): Promise<{ statusCode: number; bo
   const latitude = typeof event.latitude === 'number' ? event.latitude : parseFloat(event.latitude);
   const longitude = typeof event.longitude === 'number' ? event.longitude : parseFloat(event.longitude);
   const riderId = event.riderId || event.rider_id || 'anonymous-rider';
-  const heading = typeof event.heading === 'number' ? event.heading : 0;
-  const speed = typeof event.speed === 'number' ? event.speed : 0;
+  const rawHeading = event.heading ?? event.headingDeg ?? 0;
+  const heading = typeof rawHeading === 'number' ? rawHeading : parseFloat(rawHeading) || 0;
+  const rawSpeed = event.speed ?? event.speedKmh ?? 0;
+  const speed = typeof rawSpeed === 'number' ? rawSpeed : parseFloat(rawSpeed) || 0;
   const timestamp = event.timestamp ? new Date(event.timestamp).toISOString() : new Date().toISOString();
 
   if (isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
@@ -92,14 +94,15 @@ export async function handler(event: IoTEvent): Promise<{ statusCode: number; bo
   const dbConfig = await getDbCredentials();
   const pg = new PgClient({
     ...dbConfig,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 15000,
     ssl: { rejectUnauthorized: false },
   });
 
   try {
     await pg.connect();
 
-    // Ensure schema exists
+    // Ensure PostGIS extension and schema exist
+    await pg.query(`CREATE EXTENSION IF NOT EXISTS postgis;`);
     await pg.query(`
       CREATE TABLE IF NOT EXISTS rider_telemetry (
         id BIGSERIAL PRIMARY KEY,

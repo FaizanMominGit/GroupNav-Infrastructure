@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/client_config.dart';
 import '../models/pilot_profile.dart';
+import 'iot_policy_service.dart';
 
 abstract class AuthStorage {
   Future<void> write({required String key, required String value});
@@ -46,6 +47,7 @@ class CognitoAuthService {
   static const String _keyCredentials = 'groupnav_aws_credentials';
   static const String _keyIdToken = 'groupnav_id_token';
   static const String _keyAccessToken = 'groupnav_access_token';
+  static const String _keyRefreshToken = 'groupnav_refresh_token';
   static const String _keyBiometricEnabled = 'groupnav_biometric_enabled';
 
   CognitoAuthService({
@@ -248,6 +250,7 @@ class CognitoAuthService {
 
     final idToken = authResult['IdToken'] as String;
     final accessToken = authResult['AccessToken'] as String;
+    final refreshToken = authResult['RefreshToken'] as String? ?? '';
 
     // Decode ID token to extract user attributes
     final tokenClaims = _decodeJwtPayload(idToken);
@@ -328,8 +331,24 @@ class CognitoAuthService {
     await secureStorage.write(key: _keyCredentials, value: json.encode(awsCredentials));
     await secureStorage.write(key: _keyIdToken, value: idToken);
     await secureStorage.write(key: _keyAccessToken, value: accessToken);
+    if (refreshToken.isNotEmpty) {
+      await secureStorage.write(key: _keyRefreshToken, value: refreshToken);
+    }
 
     debugPrint('[CognitoAuthService] Real AWS credentials acquired successfully for $email');
+
+    // Attach IoT Core policy to the new Cognito Identity using our API Gateway endpoint
+    if (config.iot.attachPolicyApiEndpoint.isNotEmpty) {
+      final iotPolicyService = IotPolicyService(
+        apiEndpoint: config.iot.attachPolicyApiEndpoint,
+        region: config.region,
+      );
+      await iotPolicyService.attachPolicy(
+        accessKeyId: awsCredentials['AccessKeyId']!,
+        secretKey: awsCredentials['SecretKey']!,
+        sessionToken: awsCredentials['SessionToken']!,
+      );
+    }
 
     return {
       'pilot': pilot,
@@ -363,12 +382,142 @@ class CognitoAuthService {
     }
   }
 
+  /// Check if cached STS credentials are expired (with 5-min buffer)
+  bool areCredentialsExpired(Map<String, String>? creds) {
+    if (creds == null) return true;
+    final expirationStr = creds['Expiration'];
+    if (expirationStr == null) return false; // No expiry info — assume valid
+    try {
+      final expiry = DateTime.parse(expirationStr).toUtc();
+      final buffer = DateTime.now().toUtc().add(const Duration(minutes: 5));
+      return buffer.isAfter(expiry);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Use stored refresh token to get a new Cognito ID token, then exchange for fresh STS credentials.
+  /// Returns fresh credentials map, or null if refresh fails (user must re-login).
+  Future<Map<String, String>?> refreshAwsCredentials() async {
+    try {
+      final refreshToken = await secureStorage.read(key: _keyRefreshToken);
+      if (refreshToken == null || refreshToken.isEmpty) {
+        debugPrint('[CognitoAuthService] No refresh token stored — cannot refresh credentials.');
+        return null;
+      }
+
+      // 1. Use Cognito refresh token to get a new ID token
+      final idpEndpoint = Uri.parse('https://cognito-idp.${config.region}.amazonaws.com/');
+      final refreshResponse = await http.post(
+        idpEndpoint,
+        headers: {
+          'Content-Type': 'application/x-amz-json-1.1',
+          'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
+        },
+        body: json.encode({
+          'AuthFlow': 'REFRESH_TOKEN_AUTH',
+          'ClientId': config.cognito.userPoolClientId,
+          'AuthParameters': {
+            'REFRESH_TOKEN': refreshToken,
+          },
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      final refreshData = json.decode(refreshResponse.body) as Map<String, dynamic>;
+      if (refreshResponse.statusCode != 200) {
+        final errorType = (refreshData['__type'] as String? ?? '').split('#').last;
+        debugPrint('[CognitoAuthService] Token refresh failed [$errorType]: ${refreshData['message']}');
+        return null;
+      }
+
+      final authResult = refreshData['AuthenticationResult'] as Map<String, dynamic>?;
+      if (authResult == null) return null;
+
+      final newIdToken = authResult['IdToken'] as String;
+      final newAccessToken = authResult['AccessToken'] as String? ?? '';
+
+      // 2. Exchange new ID token for STS credentials via Cognito Identity Pool
+      final identityEndpoint = Uri.parse('https://cognito-identity.${config.region}.amazonaws.com/');
+      final providerKey = 'cognito-idp.${config.region}.amazonaws.com/${config.cognito.userPoolId}';
+
+      // Get cached identity ID from stored pilot
+      final rawPilot = await secureStorage.read(key: _keyPilot);
+      String? identityId;
+      if (rawPilot != null) {
+        try {
+          final pilotJson = json.decode(rawPilot) as Map<String, dynamic>;
+          identityId = pilotJson['cognitoIdentityId'] as String?;
+        } catch (_) {}
+      }
+
+      // If no cached identity ID, fetch it fresh
+      if (identityId == null || identityId.isEmpty) {
+        final getIdResponse = await http.post(
+          identityEndpoint,
+          headers: {
+            'Content-Type': 'application/x-amz-json-1.1',
+            'X-Amz-Target': 'AWSCognitoIdentityService.GetId',
+          },
+          body: json.encode({
+            'IdentityPoolId': config.cognito.identityPoolId,
+            'Logins': {providerKey: newIdToken},
+          }),
+        ).timeout(const Duration(seconds: 15));
+
+        final getIdData = json.decode(getIdResponse.body) as Map<String, dynamic>;
+        if (getIdResponse.statusCode != 200) return null;
+        identityId = getIdData['IdentityId'] as String;
+      }
+
+      // 3. Get fresh STS credentials
+      final getCredsResponse = await http.post(
+        identityEndpoint,
+        headers: {
+          'Content-Type': 'application/x-amz-json-1.1',
+          'X-Amz-Target': 'AWSCognitoIdentityService.GetCredentialsForIdentity',
+        },
+        body: json.encode({
+          'IdentityId': identityId,
+          'Logins': {providerKey: newIdToken},
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      final getCredsData = json.decode(getCredsResponse.body) as Map<String, dynamic>;
+      if (getCredsResponse.statusCode != 200) {
+        debugPrint('[CognitoAuthService] GetCredentialsForIdentity failed: ${getCredsData['message']}');
+        return null;
+      }
+
+      final creds = getCredsData['Credentials'] as Map<String, dynamic>;
+      final freshCreds = {
+        'AccessKeyId': creds['AccessKeyId'] as String,
+        'SecretKey': creds['SecretKey'] as String,
+        'SessionToken': creds['SessionToken'] as String,
+        if (creds['Expiration'] != null) 'Expiration': creds['Expiration'].toString(),
+      };
+
+      // 4. Persist fresh credentials and updated ID token
+      await secureStorage.write(key: _keyCredentials, value: json.encode(freshCreds));
+      await secureStorage.write(key: _keyIdToken, value: newIdToken);
+      if (newAccessToken.isNotEmpty) {
+        await secureStorage.write(key: _keyAccessToken, value: newAccessToken);
+      }
+
+      debugPrint('[CognitoAuthService] AWS credentials refreshed successfully. Expiry: ${freshCreds["Expiration"]}');
+      return freshCreds;
+    } catch (e) {
+      debugPrint('[CognitoAuthService] refreshAwsCredentials error: $e');
+      return null;
+    }
+  }
+
   /// Sign out and clear stored credentials
   Future<void> signOut() async {
     await secureStorage.delete(key: _keyPilot);
     await secureStorage.delete(key: _keyCredentials);
     await secureStorage.delete(key: _keyIdToken);
     await secureStorage.delete(key: _keyAccessToken);
+    await secureStorage.delete(key: _keyRefreshToken);
   }
 
   /// Update pilot callsign locally and in AWS Cognito User Pool

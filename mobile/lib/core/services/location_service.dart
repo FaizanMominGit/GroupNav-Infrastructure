@@ -107,17 +107,19 @@ class HardwareLocationEngine implements ILocationEngine {
           timeLimit: const Duration(seconds: 4),
         );
         final speedKmh = (currentPos.speed.clamp(0.0, 300.0) * 3.6);
-        _controller.add(
-          PositionData(
-            latitude: currentPos.latitude,
-            longitude: currentPos.longitude,
-            altitude: currentPos.altitude,
-            speedKmh: speedKmh,
-            headingDeg: currentPos.heading,
-            accuracyMeters: currentPos.accuracy,
-            timestamp: currentPos.timestamp,
-          ),
-        );
+        if (!_controller.isClosed) {
+          _controller.add(
+            PositionData(
+              latitude: currentPos.latitude,
+              longitude: currentPos.longitude,
+              altitude: currentPos.altitude,
+              speedKmh: speedKmh,
+              headingDeg: currentPos.heading,
+              accuracyMeters: currentPos.accuracy,
+              timestamp: currentPos.timestamp,
+            ),
+          );
+        }
       } catch (e) {
         debugPrint('[LocationService] Initial getCurrentPosition notice: $e');
       }
@@ -131,6 +133,7 @@ class HardwareLocationEngine implements ILocationEngine {
       await _sub?.cancel();
       _sub = Geolocator.getPositionStream(locationSettings: locationSettings).listen(
         (Position pos) {
+          if (_controller.isClosed) return;
           final speedKmh = (pos.speed.clamp(0.0, 300.0) * 3.6);
           _controller.add(
             PositionData(

@@ -103,38 +103,74 @@ class IotTelemetryService {
     }
   }
 
+  bool _isConnecting = false;
+
   /// Initialize connection to AWS IoT Core MQTT Broker over WebSockets
   Future<bool> connectMqtt({
     required String accessKeyId,
     required String secretKey,
     String? sessionToken,
   }) async {
+    // Guard against multiple simultaneous connection attempts
+    if (_isConnecting) {
+      debugPrint('[IotTelemetryService] Connection already in progress, skipping duplicate attempt.');
+      return false;
+    }
+    _isConnecting = true;
     try {
+      if (accessKeyId.isEmpty || secretKey.isEmpty) {
+        debugPrint('[IotTelemetryService] Cannot connect MQTT: empty credentials.');
+        _isConnecting = false;
+        return false;
+      }
+
       final presignedUrl = _signer.generatePresignedWebSocketUrl(
         accessKeyId: accessKeyId,
         secretKey: secretKey,
         sessionToken: sessionToken,
       );
 
+      debugPrint('[IotTelemetryService] Connecting MQTT to AWS IoT Core...');
+      debugPrint('[IotTelemetryService] Endpoint: ${config.iot.endpoint}');
+
       final clientId = 'groupnav_pilot_${DateTime.now().millisecondsSinceEpoch}';
+
+      // mqtt_client's MqttWsConnection.connect() internally does:
+      //   uri = Uri.parse(server)           → server MUST include wss:// scheme
+      //   uri = uri.replace(port: port)     → injects the port number
+      //   WebSocket.connect(uri.toString()) → connects
+      //
+      // In Dart, Uri.replace(port: 443) on a wss:// URI omits ":443" from
+      // the string because 443 is the default WSS port. So the final URL is:
+      //   wss://endpoint/mqtt?<sigv4-params>
+      // which matches the SigV4-signed Host header "endpoint" exactly. ✅
       final client = MqttServerClient.withPort(
-        presignedUrl,
+        presignedUrl, // full wss:// presigned URL — scheme required by mqtt_client
         clientId,
-        443,
+        443, // Dart omits :443 for wss:// (default port) → Host header correct
       );
 
       client.useWebSocket = true;
       client.port = 443;
+      client.websocketProtocols = MqttClientConstants.protocolsSingleDefault;
       client.logging(on: kDebugMode);
       client.keepAlivePeriod = 30;
       client.autoReconnect = true;
 
+      // AWS IoT Core requires MQTT protocol version 3.1.1 (ProtocolName='MQTT', version=4).
+      // The default MqttConnectMessage uses MQTT 3.1 (MQIsdp/v3) which AWS rejects
+      // by closing the WebSocket immediately after the CONNECT packet.
       final connMessage = MqttConnectMessage()
+          .withProtocolName('MQTT')
+          .withProtocolVersion(4)
           .withClientIdentifier(clientId)
           .startClean();
       client.connectionMessage = connMessage;
 
+      debugPrint('[IotTelemetryService] Attempting MQTT connect...');
       final status = await client.connect();
+      debugPrint('[IotTelemetryService] MQTT connect status: ${status?.state}');
+
       if (status?.state == MqttConnectionState.connected) {
         _mqttClient = client;
         _isMqttConnected = true;
@@ -165,14 +201,21 @@ class IotTelemetryService {
           }
         });
 
+        _isConnecting = false;
         return true;
+      } else {
+        debugPrint('[IotTelemetryService] MQTT connection did not reach connected state. Status: ${status?.state}');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('[IotTelemetryService] MQTT connection error: $e');
+      debugPrint('[IotTelemetryService] Stack: $stackTrace');
     }
 
     _isMqttConnected = false;
-    _connectionStatusController.add(false);
+    _isConnecting = false;
+    if (!_connectionStatusController.isClosed) {
+      _connectionStatusController.add(false);
+    }
     return false;
   }
 

@@ -115,12 +115,17 @@ class LocationConfig {
 
 class IotConfig {
   final String endpoint;
+  final String attachPolicyApiEndpoint;
 
-  const IotConfig({required this.endpoint});
+  const IotConfig({
+    required this.endpoint,
+    this.attachPolicyApiEndpoint = '',
+  });
 
   factory IotConfig.fromJson(Map<String, dynamic> json) {
     return IotConfig(
       endpoint: json['endpoint'] as String? ?? '',
+      attachPolicyApiEndpoint: json['attachPolicyApiEndpoint'] as String? ?? '',
     );
   }
 }

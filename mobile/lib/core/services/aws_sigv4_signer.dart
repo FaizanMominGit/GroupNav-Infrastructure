@@ -10,12 +10,24 @@ class AwsSigV4Signer {
     required this.endpoint,
   });
 
-  /// Generate a presigned WebSocket URL for AWS IoT Core MQTT connection
+  /// Generate a presigned WebSocket URL for AWS IoT Core MQTT connection.
+  ///
+  /// IMPORTANT: Per AWS IoT Core WebSocket SigV4 spec, the X-Amz-Security-Token
+  /// (STS session token) must NOT be included in the canonical query string that
+  /// is signed. It must be appended AFTER X-Amz-Signature in the final URL.
+  /// See: https://docs.aws.amazon.com/iot/latest/developerguide/mqtt-ws.html
+  ///
+  /// [port] — The TCP port that will appear in the Host header of the actual
+  /// WebSocket upgrade request. Dart's Uri always includes an explicit port when
+  /// set (even for the default 443), so the SigV4 canonical host must match.
+  /// Pass 443 when using mqtt_client (which calls uri.replace(port:443)), so the
+  /// signed "host:endpoint:443" equals the HTTP Host header AWS receives.
   String generatePresignedWebSocketUrl({
     required String accessKeyId,
     required String secretKey,
     String? sessionToken,
     DateTime? requestTime,
+    int port = 443,
   }) {
     final now = requestTime?.toUtc() ?? DateTime.now().toUtc();
     final dateStamp = _formatDate(now);
@@ -24,20 +36,21 @@ class AwsSigV4Signer {
     const service = 'iotdevicegateway';
     final credentialScope = '$dateStamp/$region/$service/aws4_request';
 
-    // Query parameters must be sorted alphabetically
-    final queryParams = <String, String>{
+    // Step 1: Build the query params for signing — WITHOUT the session token.
+    // The session token must be appended AFTER the signature (AWS IoT Core spec).
+    final signedQueryParams = <String, String>{
       'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
       'X-Amz-Credential': '$accessKeyId/$credentialScope',
       'X-Amz-Date': amzDate,
       'X-Amz-Expires': '86400',
-      if (sessionToken != null && sessionToken.isNotEmpty)
-        'X-Amz-Security-Token': sessionToken,
       'X-Amz-SignedHeaders': 'host',
     };
 
-    final canonicalQueryString = _buildCanonicalQueryString(queryParams);
+    final canonicalQueryString = _buildCanonicalQueryString(signedQueryParams);
 
-    // Canonical Request
+    // Step 2: Build the canonical request (session token excluded from signing).
+    // AWS IoT Core SigV4 spec requires signing Host: endpoint (hostname only,
+    // no port). AWS normalizes Host: endpoint:443 to Host: endpoint for validation.
     final canonicalRequest = [
       'GET',
       '/mqtt',
@@ -47,7 +60,7 @@ class AwsSigV4Signer {
       sha256.convert(utf8.encode('')).toString(),
     ].join('\n');
 
-    // String to Sign
+    // Step 3: String to Sign
     final stringToSign = [
       'AWS4-HMAC-SHA256',
       amzDate,
@@ -55,11 +68,20 @@ class AwsSigV4Signer {
       sha256.convert(utf8.encode(canonicalRequest)).toString(),
     ].join('\n');
 
-    // Key Derivation
+    // Step 4: Derive the signing key and compute the signature
     final signingKey = _getSignatureKey(secretKey, dateStamp, region, service);
     final signature = Hmac(sha256, signingKey).convert(utf8.encode(stringToSign)).toString();
 
-    return 'wss://$endpoint/mqtt?$canonicalQueryString&X-Amz-Signature=$signature';
+    // Step 5: Build the final URL.
+    // The URL itself uses the host without port (wss:// default is 443).
+    // mqtt_client will inject :443 via uri.replace(port: 443).
+    // Append the session token AFTER the signature (required by AWS IoT Core spec).
+    var finalUrl = 'wss://$endpoint/mqtt?$canonicalQueryString&X-Amz-Signature=$signature';
+    if (sessionToken != null && sessionToken.isNotEmpty) {
+      finalUrl += '&X-Amz-Security-Token=${Uri.encodeQueryComponent(sessionToken)}';
+    }
+
+    return finalUrl;
   }
 
   /// Sign an arbitrary HTTP request with AWS SigV4

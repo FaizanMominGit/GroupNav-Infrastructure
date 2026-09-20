@@ -2,7 +2,10 @@ import * as cdk from 'aws-cdk-lib';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as iot from 'aws-cdk-lib/aws-iot';
 import * as location from 'aws-cdk-lib/aws-location';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import { Construct } from 'constructs';
 
 export interface AuthStackProps extends cdk.StackProps {
@@ -252,23 +255,7 @@ export class AuthStack extends cdk.Stack {
           ],
         }),
         new iam.PolicyStatement({
-          sid: 'AllowIotPublishRiderTelemetry',
-          effect: iam.Effect.ALLOW,
-          actions: ['iot:Publish'],
-          resources: [
-            cdk.Fn.join('', [
-              'arn:',
-              cdk.Aws.PARTITION,
-              ':iot:',
-              cdk.Aws.REGION,
-              ':',
-              cdk.Aws.ACCOUNT_ID,
-              ':topic/groupnav/*',
-            ]),
-          ],
-        }),
-        new iam.PolicyStatement({
-          sid: 'AllowIotPackPubSub',
+          sid: 'AllowIotTelemetryPubSub',
           effect: iam.Effect.ALLOW,
           actions: ['iot:Publish', 'iot:Subscribe', 'iot:Receive'],
           resources: [
@@ -279,7 +266,7 @@ export class AuthStack extends cdk.Stack {
               cdk.Aws.REGION,
               ':',
               cdk.Aws.ACCOUNT_ID,
-              ':topic/groupnav/packs/*',
+              ':topic/groupnav/*',
             ]),
             cdk.Fn.join('', [
               'arn:',
@@ -288,13 +275,43 @@ export class AuthStack extends cdk.Stack {
               cdk.Aws.REGION,
               ':',
               cdk.Aws.ACCOUNT_ID,
-              ':topicfilter/groupnav/packs/*',
+              ':topicfilter/groupnav/*',
             ]),
           ],
         }),
       ],
     });
     this.authenticatedRole.attachInlinePolicy(iotPolicy);
+
+    // IoT Core Resource Policy
+    // This is required in ADDITION to the IAM role policy above.
+    // For Cognito Identity Pool + IoT Core MQTT over WebSocket (SigV4), AWS IoT Core
+    // checks BOTH the IAM policy on the Cognito role AND an IoT Core resource policy
+    // attached to the principal. Without this, IoT Core closes the connection after
+    // the MQTT CONNECT packet with no CONNACK (silent auth failure).
+    const iotCorePolicy = new iot.CfnPolicy(this, 'GroupNavRiderIotCorePolicy', {
+      policyName: 'GroupNav-Rider-IoT-Access',
+      policyDocument: {
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Action: 'iot:Connect',
+            Resource: `arn:aws:iot:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:client/*`,
+          },
+          {
+            Effect: 'Allow',
+            Action: ['iot:Publish', 'iot:Receive'],
+            Resource: `arn:aws:iot:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:topic/groupnav/*`,
+          },
+          {
+            Effect: 'Allow',
+            Action: 'iot:Subscribe',
+            Resource: `arn:aws:iot:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:topicfilter/groupnav/*`,
+          },
+        ],
+      },
+    });
 
     // Attach Authenticated Role to Identity Pool
     new cognito.CfnIdentityPoolRoleAttachment(this, 'IdentityPoolRoleAttachment', {
@@ -373,6 +390,54 @@ export class AuthStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'AuthenticatedRoleArn', {
       value: this.authenticatedRole.roleArn,
       description: 'IAM Role ARN for authenticated riders',
+    });
+
+    // 8. Lambda Function for IoT Policy Attachment
+    const attachIotPolicyHandler = new lambda.Function(this, 'AttachIotPolicyHandler', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda/attach-iot-policy'),
+      environment: {
+        IOT_POLICY_NAME: iotCorePolicy.policyName!,
+      },
+    });
+
+    // Grant Lambda permissions to attach IoT policies
+    attachIotPolicyHandler.addToRolePolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['iot:AttachPrincipalPolicy'],
+      // AttachPrincipalPolicy resource must be the policy being attached or '*'
+      resources: [
+        cdk.Fn.join('', [
+          'arn:', cdk.Aws.PARTITION, ':iot:', cdk.Aws.REGION, ':', cdk.Aws.ACCOUNT_ID,
+          ':policy/', iotCorePolicy.policyName!
+        ])
+      ],
+    }));
+
+    // 9. API Gateway for IoT Policy Attachment
+    const attachPolicyApi = new apigateway.RestApi(this, 'AttachPolicyApi', {
+      restApiName: 'GroupNav IoT Policy API',
+      description: 'API for attaching IoT Core policies to authenticated Cognito identities',
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: ['POST', 'OPTIONS'],
+        allowHeaders: ['*'],
+      },
+    });
+
+    const attachPolicyResource = attachPolicyApi.root.addResource('attach-policy');
+    attachPolicyResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(attachIotPolicyHandler),
+      {
+        authorizationType: apigateway.AuthorizationType.IAM,
+      }
+    );
+
+    new cdk.CfnOutput(this, 'AttachPolicyApiEndpoint', {
+      value: attachPolicyApi.url,
+      description: 'API Gateway Endpoint for attaching IoT Policy',
     });
   }
 }

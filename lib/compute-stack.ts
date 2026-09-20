@@ -81,7 +81,7 @@ export class ComputeStack extends cdk.Stack {
       entry: path.join(__dirname, '../lambda/process-telemetry/index.ts'),
       handler: 'handler',
       runtime: lambda.Runtime.NODEJS_22_X,
-      timeout: cdk.Duration.seconds(15),
+      timeout: cdk.Duration.seconds(30),
       memorySize: 256,
       vpc,
       vpcSubnets: {
@@ -147,6 +147,38 @@ export class ComputeStack extends cdk.Stack {
       functionName: this.processTelemetryLambda.functionArn,
       principal: 'iot.amazonaws.com',
       sourceArn: this.topicRule.attrArn,
+    });
+
+    // 5b. Pack Telemetry Topic Rule (for riders broadcasting in a pack)
+    const packTopicRule = new iot.CfnTopicRule(this, 'PackTelemetryTopicRule', {
+      ruleName: 'groupnav_pack_telemetry_ingestion_rule',
+      topicRulePayload: {
+        sql: "SELECT *, topic(3) as pack_id FROM 'groupnav/packs/+/telemetry'",
+        ruleDisabled: false,
+        awsIotSqlVersion: '2016-03-23',
+        description: 'Routes pack rider GPS telemetry to processTelemetry Lambda with SQS DLQ fallback',
+        actions: [
+          {
+            lambda: {
+              functionArn: this.processTelemetryLambda.functionArn,
+            },
+          },
+        ],
+        errorAction: {
+          sqs: {
+            queueUrl: this.dlq.queueUrl,
+            roleArn: iotRuleRole.roleArn,
+            useBase64: false,
+          },
+        },
+      },
+    });
+
+    new lambda.CfnPermission(this, 'IotInvokePackTelemetryLambdaPermission', {
+      action: 'lambda:InvokeFunction',
+      functionName: this.processTelemetryLambda.functionArn,
+      principal: 'iot.amazonaws.com',
+      sourceArn: packTopicRule.attrArn,
     });
 
     // 6. Outputs

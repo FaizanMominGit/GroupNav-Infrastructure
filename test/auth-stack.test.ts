@@ -186,7 +186,7 @@ describe('AuthStack', () => {
             Effect: 'Allow',
           }),
           Match.objectLike({
-            Action: 'iot:Publish',
+            Action: Match.arrayWith(['iot:Publish', 'iot:Subscribe', 'iot:Receive']),
             Effect: 'Allow',
           }),
         ]),

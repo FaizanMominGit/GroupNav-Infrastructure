@@ -16,7 +16,8 @@
     "placeIndexArn": "arn:aws:geo:ap-south-1:325313611329:place-index/GroupNavPlaceIndex"
   },
   "iot": {
-    "endpoint": "a362o0ub4ypzaj-ats.iot.ap-south-1.amazonaws.com"
+    "endpoint": "a362o0ub4ypzaj-ats.iot.ap-south-1.amazonaws.com",
+    "attachPolicyApiEndpoint": "https://j9tlu1hzc7.execute-api.ap-south-1.amazonaws.com/prod/attach-policy"
   },
   "network": {
     "vpcId": "vpc-00344461b667c775b",

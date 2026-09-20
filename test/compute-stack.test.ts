@@ -27,7 +27,7 @@ describe('ComputeStack', () => {
     template.hasResourceProperties('AWS::Lambda::Function', {
       FunctionName: 'groupnav-process-telemetry',
       Runtime: 'nodejs22.x',
-      Timeout: 15,
+      Timeout: 30,
       MemorySize: 256,
       Environment: {
         Variables: Match.objectLike({
@@ -57,6 +57,23 @@ describe('ComputeStack', () => {
       TopicRulePayload: Match.objectLike({
         RuleDisabled: false,
         Sql: Match.stringLikeRegexp(".*groupnav/\\+/telemetry.*"),
+        Actions: Match.arrayWith([
+          Match.objectLike({
+            Lambda: Match.anyValue(),
+          }),
+        ]),
+        ErrorAction: Match.objectLike({
+          Sqs: Match.anyValue(),
+        }),
+      }),
+    });
+  });
+
+  test('provisions IoT Topic Rule for groupnav/packs/+/telemetry with Lambda and SQS error actions', () => {
+    template.hasResourceProperties('AWS::IoT::TopicRule', {
+      TopicRulePayload: Match.objectLike({
+        RuleDisabled: false,
+        Sql: Match.stringLikeRegexp(".*groupnav/packs/\\+/telemetry.*"),
         Actions: Match.arrayWith([
           Match.objectLike({
             Lambda: Match.anyValue(),

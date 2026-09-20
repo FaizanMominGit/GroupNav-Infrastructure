@@ -168,6 +168,8 @@ class IotTelemetryService {
         client.subscribe('groupnav/+/telemetry', MqttQos.atLeastOnce);
         client.subscribe('groupnav/packs/+/telemetry', MqttQos.atLeastOnce);
         client.subscribe('groupnav/packs/+/alerts', MqttQos.atLeastOnce);
+        client.subscribe('groupnav/+/alerts', MqttQos.atLeastOnce);
+        client.subscribe('groupnav/convoy/alerts', MqttQos.atLeastOnce);
         client.subscribe('groupnav/+/routes', MqttQos.atLeastOnce);
         client.subscribe('groupnav/packs/+/routes', MqttQos.atLeastOnce);
 
@@ -389,17 +391,22 @@ class IotTelemetryService {
     }
   }
 
-  /// Broadcast a Quick Convoy Alert to AWS IoT Core
+  /// Broadcast a Quick Convoy Alert or SOS to AWS IoT Core
   void publishAlert({
     required String packId,
     required String alertType,
     String? callsign,
     String? message,
   }) {
+    final cleanCode = packId.trim().toUpperCase();
+    final normalizedPackId = cleanCode.startsWith('GN-') || cleanCode.startsWith('PACK-') || cleanCode == 'SOLO' || cleanCode == 'CONVOY'
+        ? cleanCode
+        : 'GN-$cleanCode';
+
     final alertData = {
-      'packId': packId,
+      'packId': normalizedPackId,
       'alertType': alertType,
-      'callsign': callsign ?? _currentCallsign,
+      'callsign': (callsign != null && callsign.isNotEmpty) ? callsign : _currentCallsign,
       'message': message ?? 'Alert triggered',
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     };
@@ -408,12 +415,13 @@ class IotTelemetryService {
 
     if (_mqttClient != null && _isMqttConnected) {
       try {
-        final topic = 'groupnav/packs/$packId/alerts';
+        final topic = 'groupnav/packs/$normalizedPackId/alerts';
         final builder = MqttClientPayloadBuilder();
         builder.addString(jsonEncode(alertData));
         _mqttClient!.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
         _broadcastCount++;
         _lastBroadcastTime = DateTime.now();
+        debugPrint('[IotTelemetryService] Broadcast alert $alertType on MQTT topic $topic');
       } catch (e) {
         debugPrint('[IotTelemetryService] Publish alert error: $e');
       }

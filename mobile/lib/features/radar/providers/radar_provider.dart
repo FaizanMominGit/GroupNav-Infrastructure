@@ -5,6 +5,7 @@ import '../../auth/models/auth_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../settings/models/rider_settings.dart';
 import '../../settings/providers/settings_provider.dart';
+import '../models/convoy_alert.dart';
 import '../models/convoy_peer.dart';
 import '../models/convoy_route.dart';
 import '../services/aws_location_route_service.dart';
@@ -27,6 +28,7 @@ class RadarState {
   final DateTime? lastBroadcastTime;
   final bool isLeader;
   final List<ConvoyRoute> customRoutes;
+  final ConvoyAlert? activeAlert;
 
   const RadarState({
     this.peers = const [],
@@ -45,6 +47,7 @@ class RadarState {
     this.lastBroadcastTime,
     this.isLeader = true,
     this.customRoutes = const [],
+    this.activeAlert,
   });
 
   String get headingDisplay {
@@ -86,6 +89,8 @@ class RadarState {
     DateTime? lastBroadcastTime,
     bool? isLeader,
     List<ConvoyRoute>? customRoutes,
+    ConvoyAlert? activeAlert,
+    bool clearAlert = false,
   }) {
     return RadarState(
       peers: peers ?? this.peers,
@@ -104,6 +109,7 @@ class RadarState {
       lastBroadcastTime: lastBroadcastTime ?? this.lastBroadcastTime,
       isLeader: isLeader ?? this.isLeader,
       customRoutes: customRoutes ?? this.customRoutes,
+      activeAlert: clearAlert ? null : (activeAlert ?? this.activeAlert),
     );
   }
 }
@@ -193,6 +199,26 @@ class RadarNotifier extends StateNotifier<RadarState> {
     _listenToTelemetry();
     _listenToConnection();
     _listenToRouteUpdates();
+    _listenToAlerts();
+  }
+
+  void _listenToAlerts() {
+    _telemetryService.alertStream.listen((alertJson) {
+      if (!mounted) return;
+      final alert = ConvoyAlert.fromJson(alertJson);
+      state = state.copyWith(activeAlert: alert);
+      if (!alert.isSos) {
+        Future.delayed(const Duration(seconds: 45), () {
+          if (mounted && state.activeAlert?.timestamp == alert.timestamp) {
+            state = state.copyWith(clearAlert: true);
+          }
+        });
+      }
+    });
+  }
+
+  void dismissAlert() {
+    state = state.copyWith(clearAlert: true);
   }
 
   void _listenToConnection() {

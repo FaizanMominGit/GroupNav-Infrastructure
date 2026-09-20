@@ -54,8 +54,8 @@ class PackRosterCard extends StatelessWidget {
         children: [
           // Avatar
           Container(
-            width: 40,
-            height: 40,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
               color: member.avatarBackgroundColor,
               shape: BoxShape.circle,
@@ -66,7 +66,7 @@ class PackRosterCard extends StatelessWidget {
               style: AppTypography.labelLg.copyWith(
                 color: member.avatarTextColor,
                 fontWeight: FontWeight.w700,
-                fontSize: 14,
+                fontSize: 15,
               ),
             ),
           ),
@@ -78,6 +78,7 @@ class PackRosterCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Row 1: Prominent Rider Callsign + Lead Star / You Tag
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -85,43 +86,20 @@ class PackRosterCard extends StatelessWidget {
                       child: Text(
                         member.cleanCallsign,
                         style: AppTypography.headlineMd.copyWith(
-                          fontSize: 15,
+                          fontSize: 15.5,
                           fontWeight: FontWeight.w700,
                           color: isOffline ? AppColors.textSecondary : AppColors.textPrimary,
                         ),
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    // Tactical Role Badge Pill
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: member.roleBadgeColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: member.roleBadgeColor.withValues(alpha: 0.4),
-                          width: 0.8,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(member.roleIcon, size: 10, color: member.roleBadgeColor),
-                          const SizedBox(width: 3),
-                          Text(
-                            member.roleLabel,
-                            style: AppTypography.labelSm.copyWith(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: member.roleBadgeColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    if (member.isRoadCaptain) ...[
+                      const SizedBox(width: 4),
+                      const Icon(Icons.star, size: 14, color: AppColors.primary),
+                    ],
                     if (member.isCurrentUser || member.callsign.contains('(You)')) ...[
-                      const SizedBox(width: 5),
+                      const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                         decoration: BoxDecoration(
@@ -141,18 +119,60 @@ class PackRosterCard extends StatelessWidget {
                     ],
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  isOffline
-                      ? (member.lastSeenDescription ?? 'Offline · 3m ago')
-                      : '${member.speedKmh.round()} km/h · ${member.offsetDescription}',
-                  style: AppTypography.bodySm.copyWith(
-                    fontSize: 12,
-                    color: isWarning
-                        ? AppColors.alertWarning
-                        : AppColors.textSecondary,
-                    fontWeight: isWarning ? FontWeight.w600 : FontWeight.w400,
-                  ),
+                const SizedBox(height: 3),
+
+                // Row 2: Live Speed + Role Tag
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isOffline
+                          ? (member.lastSeenDescription ?? 'Offline · 3m ago')
+                          : '${member.speedKmh.round()} km/h',
+                      style: AppTypography.bodySm.copyWith(
+                        fontSize: 12,
+                        color: isWarning ? AppColors.alertWarning : AppColors.textSecondary,
+                        fontWeight: isWarning ? FontWeight.w600 : FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '•',
+                      style: TextStyle(fontSize: 10, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: member.roleBadgeColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: member.roleBadgeColor.withValues(alpha: 0.3),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(member.roleIcon, size: 9.5, color: member.roleBadgeColor),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                member.roleLabel,
+                                style: AppTypography.labelSm.copyWith(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: member.roleBadgeColor,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -183,7 +203,7 @@ class PackRosterCard extends StatelessWidget {
             )
           else
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
               decoration: BoxDecoration(
                 color: isLead
                     ? AppColors.primary
@@ -196,25 +216,28 @@ class PackRosterCard extends StatelessWidget {
                 isLead
                     ? 'Leader'
                     : isWarning
-                        ? 'Lagging +790m'
-                        : 'With Pack',
+                        ? (member.offsetDescription.isNotEmpty ? member.offsetDescription : 'Lagging')
+                        : (member.offsetDescription.isNotEmpty ? member.offsetDescription : 'With Pack'),
                 style: AppTypography.labelSm.copyWith(
                   color: isLead || isWarning
                       ? Colors.white
                       : AppColors.onSecondaryContainer,
                   fontWeight: FontWeight.w700,
-                  fontSize: 11,
+                  fontSize: 10.5,
                 ),
               ),
             ),
 
           // Road Captain Moderation Menu
           if (canModerate) ...[
-            const SizedBox(width: 4),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textSecondary),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
+            const SizedBox(width: 2),
+            SizedBox(
+              width: 22,
+              height: 28,
+              child: PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textSecondary),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               onSelected: (action) {
                 if (action == 'assign_sweeper') {
                   onRoleChanged?.call(PackRole.tailGunner);
@@ -259,9 +282,10 @@ class PackRosterCard extends StatelessWidget {
                 ),
               ],
             ),
-          ],
+          ),
         ],
-      ),
-    );
+      ],
+    ),
+  );
   }
 }

@@ -262,6 +262,87 @@ class PackManagementScreen extends ConsumerWidget {
         }),
         const SizedBox(height: 16),
 
+        // Active Convoy Alert Banner (if any alert or SOS is active)
+        if (formation.activeAlert != null) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: formation.activeAlert!.isSos
+                  ? AppColors.alertCritical.withValues(alpha: 0.12)
+                  : AppColors.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: formation.activeAlert!.isSos
+                    ? AppColors.alertCritical
+                    : AppColors.primary.withValues(alpha: 0.4),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: formation.activeAlert!.isSos ? AppColors.alertCritical : AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    formation.activeAlert!.isSos ? Icons.emergency : Icons.campaign,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        formation.activeAlert!.isSos
+                            ? 'EMERGENCY SOS ACTIVE'
+                            : 'CONVOY ALERT BROADCAST',
+                        style: AppTypography.labelSm.copyWith(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: formation.activeAlert!.isSos
+                              ? AppColors.alertCritical
+                              : AppColors.primary,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${formation.activeAlert!.callsign}: "${formation.activeAlert!.alertType}"',
+                        style: AppTypography.headlineMd.copyWith(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (formation.activeAlert!.message.isNotEmpty &&
+                          formation.activeAlert!.message != 'Alert triggered') ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          formation.activeAlert!.message,
+                          style: AppTypography.bodySm.copyWith(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18, color: AppColors.textSecondary),
+                  onPressed: () => packNotifier.dismissAlert(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
         // 5. High-Emphasis SOS Broadcast Section
         SizedBox(
           width: double.infinity,
@@ -776,7 +857,12 @@ class PackManagementScreen extends ConsumerWidget {
           children: [
             Icon(Icons.emergency, color: AppColors.alertCritical),
             SizedBox(width: 8),
-            Text('Confirm Pack SOS'),
+            Flexible(
+              child: Text(
+                'Confirm Pack SOS',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         content: const Text(

@@ -987,3 +987,33 @@ When an issue, error, or unexpected behavior is encountered, document it using t
   - Built debug APK and installed on physical device.
 - **Prevention Rule**:
   Never hardcode relative spatial or telemetry properties in real-time domain models. Ensure all pub/sub packets serialize the complete required semantic metadata (`isLeader`, speed, heading, altitude).
+
+---
+
+### [ISSUE-037] Convoy Roster Rider Name Truncation & Silent/Ignored Quick Alerts and Emergency SOS
+- **Date & Phase**: 2026-09-20 | Multi-Rider Telemetry & Safety Alerts
+- **Component / Command**: `PackRosterCard`, `GeofenceSliderWidget`, `IotTelemetryService`, `PackNotifier`, `RadarNotifier`, `MainShellScreen`, `RadarHudSheet`
+- **Symptom / Error Message**:
+  1. Rider names in the Convoy Roster screen were either truncated (`faiz...`) or completely invisible/squeezed to zero width with 10px RenderFlex overflows.
+  2. The `Pack Geofence Radius` card overflowed horizontally by 43px on narrow viewports.
+  3. Quick Convoy status alerts ("Refuel", "Regroup", "Issue") and Emergency SOS broadcasts appeared to "not work" on other riders' devices: when triggered, no persistent alert card or dialog was shown outside of a transient, tab-isolated SnackBar on `LiveRadarScreen`.
+  4. `PackManagementScreen` and `MainShellScreen` had zero subscriptions to `alertStream`. If an SOS was broadcast while riders were viewing the Convoy tab, no notification or dialog appeared.
+  5. `broadcastSos()` in `PackNotifier` broadcasted on `groupnav/packs/$packId/alerts` using raw numeric `packId` (e.g. `6311`) instead of the standardized `GN-6311` format, mismatched with radar alert topics.
+- **Root Cause Analysis**:
+  1. `PackRosterCard` crammed the rider callsign, a wide tactical role badge pill (`★ Road Captain`), and a `You` tag all into Row 1 next to an unconstrained distance pill and moderation menu, starving the name of horizontal flex space.
+  2. `IotTelemetryService` only subscribed to a narrow set of alert topics, and `alertStream` was only listened to locally by `LiveRadarScreen.initState`. Because `MainShellScreen` uses an `IndexedStack`, alerts were swallowed when on other tabs.
+  3. Emergency SOS lacked a high-priority interrupt pattern, behaving like a generic passive notification.
+- **Fix / Solution Applied**:
+  1. Created formal `ConvoyAlert` domain model (`mobile/lib/features/radar/models/convoy_alert.dart`) parsing `alertType`, `callsign`, `message`, `timestamp`, and `isSos`.
+  2. Overhauled `PackRosterCard`: allocated Row 1 exclusively to the rider's clean callsign and compact status glyphs (`★` for Lead, `You` pill), moving live speed and role to Row 2 (`0 km/h • Road Captain`).
+  3. Normalized pack code formatting across `IotTelemetryService.publishAlert` and `PackNotifier.broadcastSos` to guarantee uniform MQTT topics (`groupnav/packs/GN-XXXX/alerts`).
+  4. Broadened AWS IoT Core MQTT subscriptions in `connectMqtt` to include `groupnav/packs/+/alerts`, `groupnav/+/alerts`, and `groupnav/convoy/alerts`.
+  5. Added persistent `activeAlert` tracking across `PackFormation` and `RadarState`.
+  6. Implemented a persistent, high-emphasis alert banner in `PackManagementScreen` and `RadarHudSheet`.
+  7. Implemented a global Emergency SOS interrupt handler in `MainShellScreen` that vibrates with heavy haptics and displays a high-contrast emergency modal with a direct "View on Live Radar" action across all tabs.
+- **Verification**:
+  - `flutter analyze` &rarr; No issues found (0 warnings, 0 errors).
+  - Clean debug APK assembly via `flutter build apk --debug`.
+  - Verified on physical hardware (A142): rider names rendered with 100% visibility, zero flex overflows, and triggering "BROADCAST PACK SOS" produced immediate alert banners and AWS IoT Core MQTT packets.
+- **Prevention Rule**:
+  Critical safety and convoy events (like SOS and regrouping alerts) must be handled at the root shell application level rather than within individual tab sub-views. High-priority alerts must always include audible/haptic interrupts and persistent visual banners.

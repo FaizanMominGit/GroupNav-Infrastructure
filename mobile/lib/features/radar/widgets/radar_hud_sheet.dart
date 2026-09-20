@@ -432,6 +432,45 @@ class RadarHudSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
 
+                if (state.activeAlert != null) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: state.activeAlert!.isSos
+                          ? AppColors.alertCritical.withValues(alpha: 0.15)
+                          : AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: state.activeAlert!.isSos
+                            ? AppColors.alertCritical
+                            : AppColors.primary.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          state.activeAlert!.isSos ? Icons.emergency : Icons.campaign,
+                          size: 16,
+                          color: state.activeAlert!.isSos ? AppColors.alertCritical : AppColors.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            state.activeAlert!.isSos
+                                ? 'EMERGENCY SOS: ${state.activeAlert!.callsign} requested response!'
+                                : 'Active Alert: "${state.activeAlert!.alertType}" from ${state.activeAlert!.callsign}',
+                            style: AppTypography.labelSm.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: state.activeAlert!.isSos ? AppColors.alertCritical : AppColors.primaryDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 // 4 Status Buttons in Responsive Row
                 Row(
                   children: [

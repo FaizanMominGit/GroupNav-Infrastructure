@@ -1,3 +1,4 @@
+import '../../radar/models/convoy_alert.dart';
 import '../../radar/models/convoy_route.dart';
 import 'pack_member.dart';
 
@@ -14,6 +15,7 @@ class PackFormation {
   final String hostRiderId;
   final String status;
   final ConvoyRoute? activeRoute;
+  final ConvoyAlert? activeAlert;
 
   const PackFormation({
     this.packId = '',
@@ -28,6 +30,7 @@ class PackFormation {
     this.hostRiderId = '',
     this.status = 'active',
     this.activeRoute,
+    this.activeAlert,
   });
 
   String get shareLink => 'https://groupnav.app/join/$packCode';
@@ -86,6 +89,8 @@ class PackFormation {
     String? status,
     ConvoyRoute? activeRoute,
     bool clearRoute = false,
+    ConvoyAlert? activeAlert,
+    bool clearAlert = false,
   }) {
     return PackFormation(
       packId: packId ?? this.packId,
@@ -100,6 +105,7 @@ class PackFormation {
       hostRiderId: hostRiderId ?? this.hostRiderId,
       status: status ?? this.status,
       activeRoute: clearRoute ? null : (activeRoute ?? this.activeRoute),
+      activeAlert: clearAlert ? null : (activeAlert ?? this.activeAlert),
     );
   }
 }

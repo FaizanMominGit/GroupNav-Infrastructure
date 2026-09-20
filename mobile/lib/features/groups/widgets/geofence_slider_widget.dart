@@ -36,27 +36,34 @@ class GeofenceSliderWidget extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(8),
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.fence, size: 18, color: AppColors.primary),
                     ),
-                    child: const Icon(Icons.fence, size: 20, color: AppColors.primary),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Pack Geofence Radius',
-                    style: AppTypography.headlineMd.copyWith(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Pack Geofence Radius',
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.headlineMd.copyWith(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               // Formatted live radius readout
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

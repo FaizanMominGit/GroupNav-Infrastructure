@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../radar/models/convoy_alert.dart';
 import '../../radar/models/convoy_route.dart';
 import '../../radar/providers/radar_provider.dart';
 import '../../radar/services/iot_telemetry_service.dart';
@@ -37,6 +38,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
   final IQrScannerService? _qrScannerService;
   Timer? _rosterSyncTimer;
   StreamSubscription? _telemetrySub;
+  StreamSubscription? _alertSub;
   static const _storage = FlutterSecureStorage();
   static const _activePackKey = 'groupnav_active_pack_code';
 
@@ -49,6 +51,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
   ]) : super(_soloFormation()) {
     _initRiderIdentity();
     _listenToTelemetryForRoster();
+    _listenToAlerts();
     _radarNotifier?.onRouteBroadcast = (route) {
       syncRouteToDynamoDb(route);
     };
@@ -195,18 +198,20 @@ class PackNotifier extends StateNotifier<PackFormation> {
 
   void broadcastSos() {
     final callsign = _ref?.read(authNotifierProvider).pilot?.callsign ?? 'Pilot';
-    final packId = state.packId.isNotEmpty ? state.packId : 'convoy';
+    final packCode = state.packCode.isNotEmpty
+        ? state.packCode
+        : (state.packId.isNotEmpty ? 'GN-${state.packId}' : 'convoy');
     const message = 'CRITICAL: Rider requested immediate emergency response.';
     if (_telemetryService != null) {
       _telemetryService.publishAlert(
-        packId: packId,
+        packId: packCode,
         alertType: 'Emergency SOS',
         callsign: callsign,
         message: message,
       );
     } else {
       _radarNotifier?.publishAlert(
-        packId: packId,
+        packId: packCode,
         alertType: 'Emergency SOS',
         callsign: callsign,
         message: message,
@@ -642,10 +647,31 @@ class PackNotifier extends StateNotifier<PackFormation> {
     });
   }
 
+  void _listenToAlerts() {
+    _alertSub?.cancel();
+    _alertSub = _telemetryService?.alertStream.listen((alertJson) {
+      if (!mounted) return;
+      final alert = ConvoyAlert.fromJson(alertJson);
+      state = state.copyWith(activeAlert: alert);
+      if (!alert.isSos) {
+        Future.delayed(const Duration(seconds: 45), () {
+          if (mounted && state.activeAlert?.timestamp == alert.timestamp) {
+            state = state.copyWith(clearAlert: true);
+          }
+        });
+      }
+    });
+  }
+
+  void dismissAlert() {
+    state = state.copyWith(clearAlert: true);
+  }
+
   @override
   void dispose() {
     _rosterSyncTimer?.cancel();
     _telemetrySub?.cancel();
+    _alertSub?.cancel();
     super.dispose();
   }
 }

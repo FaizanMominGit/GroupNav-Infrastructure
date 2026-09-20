@@ -24,11 +24,18 @@ class ConvoyPeer {
   });
 
   String get offsetFormatted {
-    if (isLeader) return monikerTag ?? 'HQ';
-    if (relativeOffsetMeters >= 0) {
-      return '+${relativeOffsetMeters.round()}m';
+    if (callsign.contains('(You)')) {
+      return isLeader ? 'Lead' : 'You';
+    }
+    final absDist = relativeOffsetMeters.abs();
+    final sign = relativeOffsetMeters >= 0 ? '+' : '-';
+    if (absDist < 15) {
+      return isLeader ? 'Lead' : 'With Pack';
+    } else if (absDist >= 1000) {
+      final km = absDist / 1000.0;
+      return '$sign${km.toStringAsFixed(1)}km';
     } else {
-      return '${relativeOffsetMeters.round()}m';
+      return '$sign${absDist.round()}m';
     }
   }
 

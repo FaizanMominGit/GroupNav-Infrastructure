@@ -36,6 +36,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
   final IotTelemetryService? _telemetryService;
   final IQrScannerService? _qrScannerService;
   Timer? _rosterSyncTimer;
+  StreamSubscription? _telemetrySub;
   static const _storage = FlutterSecureStorage();
   static const _activePackKey = 'groupnav_active_pack_code';
 
@@ -47,6 +48,7 @@ class PackNotifier extends StateNotifier<PackFormation> {
     this._qrScannerService,
   ]) : super(_soloFormation()) {
     _initRiderIdentity();
+    _listenToTelemetryForRoster();
     _radarNotifier?.onRouteBroadcast = (route) {
       syncRouteToDynamoDb(route);
     };
@@ -590,9 +592,60 @@ class PackNotifier extends StateNotifier<PackFormation> {
     }
   }
 
+  void _listenToTelemetryForRoster() {
+    _telemetrySub?.cancel();
+    _telemetrySub = _telemetryService?.convoyStream.listen((peers) {
+      if (!mounted || !state.isInPack || state.members.isEmpty) return;
+
+      bool hasChanges = false;
+      final updatedMembers = state.members.map((member) {
+        final cleanMemberCallsign = member.callsign.replaceAll(' (You)', '').trim().toLowerCase();
+        final match = peers.where((p) {
+          final cleanPeerCallsign = p.callsign.replaceAll(' (You)', '').trim().toLowerCase();
+          return cleanPeerCallsign == cleanMemberCallsign;
+        }).firstOrNull;
+
+        if (match != null) {
+          final newSpeed = match.speedKmh;
+          final newOffset = match.relativeOffsetMeters;
+          final absOffset = newOffset.abs();
+
+          String newDesc;
+          if (member.isLeader) {
+            newDesc = newSpeed > 5 ? '${newSpeed.round()} km/h · Leading' : 'Road Captain';
+          } else if (absOffset < 20) {
+            newDesc = 'With Pack';
+          } else {
+            final formattedDist = absOffset >= 1000
+                ? '${(absOffset / 1000).toStringAsFixed(1)}km'
+                : '${absOffset.round()}m';
+            newDesc = newOffset >= 0 ? '+$formattedDist ahead' : '$formattedDist behind';
+          }
+
+          if (member.speedKmh != newSpeed ||
+              (member.offsetMeters - newOffset).abs() > 2 ||
+              member.offsetDescription != newDesc) {
+            hasChanges = true;
+            return member.copyWith(
+              speedKmh: newSpeed,
+              offsetMeters: newOffset,
+              offsetDescription: newDesc,
+            );
+          }
+        }
+        return member;
+      }).toList();
+
+      if (hasChanges) {
+        state = state.copyWith(members: updatedMembers);
+      }
+    });
+  }
+
   @override
   void dispose() {
     _rosterSyncTimer?.cancel();
+    _telemetrySub?.cancel();
     super.dispose();
   }
 }

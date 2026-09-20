@@ -232,9 +232,9 @@ class IotTelemetryService {
         speedKmh: packet.speedKmh,
         headingDeg: packet.headingDeg,
         relativeOffsetMeters: 0,
-        isLeader: data['isLeader'] as bool? ?? false,
-        beaconColorHex: '#00C48C',
-        monikerTag: data['isLeader'] == true ? 'Lead' : 'Rider',
+        isLeader: packet.isLeader,
+        beaconColorHex: packet.isLeader ? '#FFB800' : '#00C48C',
+        monikerTag: packet.isLeader ? 'Lead' : 'Rider',
       );
 
       _activePeers[packet.callsign] = remotePeer;
@@ -281,6 +281,7 @@ class IotTelemetryService {
           altitude: pos.altitude,
           speedKmh: pos.speedKmh,
           headingDeg: pos.headingDeg,
+          isLeader: _isLeader,
           timestamp: DateTime.now().millisecondsSinceEpoch,
         );
         publishTelemetry(packet);
@@ -289,9 +290,57 @@ class IotTelemetryService {
   }
 
   void _emitPeers() {
-    if (_activePeers.isNotEmpty) {
+    if (_activePeers.isEmpty) return;
+
+    // Resolve self peer
+    final selfKey = _activePeers.keys.firstWhere(
+      (k) => _activePeers[k]?.callsign.contains('(You)') ?? false,
+      orElse: () => '',
+    );
+    final self = selfKey.isNotEmpty ? _activePeers[selfKey] : null;
+
+    if (self == null) {
       _telemetryController.add(_activePeers.values.toList());
+      return;
     }
+
+    const distCalc = Distance();
+    final updatedList = <ConvoyPeer>[];
+
+    for (final entry in _activePeers.entries) {
+      final peer = entry.value;
+      if (entry.key == selfKey) {
+        updatedList.add(peer.copyWith(relativeOffsetMeters: 0));
+        continue;
+      }
+
+      final distMeters = distCalc.as(
+        LengthUnit.Meter,
+        LatLng(self.latitude, self.longitude),
+        LatLng(peer.latitude, peer.longitude),
+      );
+
+      // Determine whether the peer is ahead (+) or behind (-) relative to heading
+      double signedOffset = distMeters;
+      if (self.speedKmh > 3 || self.headingDeg > 0) {
+        final bearing = distCalc.bearing(
+          LatLng(self.latitude, self.longitude),
+          LatLng(peer.latitude, peer.longitude),
+        );
+        final diff = (bearing - self.headingDeg + 540) % 360 - 180;
+        signedOffset = diff.abs() <= 90 ? distMeters : -distMeters;
+      } else {
+        if (peer.isLeader) {
+          signedOffset = distMeters;
+        } else if (self.isLeader) {
+          signedOffset = -distMeters;
+        }
+      }
+
+      updatedList.add(peer.copyWith(relativeOffsetMeters: signedOffset));
+    }
+
+    _telemetryController.add(updatedList);
   }
 
   /// Publish a TelemetryPacket to AWS IoT Core

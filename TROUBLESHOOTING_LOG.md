@@ -962,3 +962,28 @@ When an issue, error, or unexpected behavior is encountered, document it using t
   - Verified DynamoDB schemaless attribute persistence and cross-device recovery.
 - **Prevention Rule**:
   Never rely solely on ephemeral pub/sub broadcasts for state that late joiners or reconnecting clients need. Always back shared state with an authoritative persistent datastore (DynamoDB) and use pub/sub as a low-latency cache invalidator/notifier.
+
+---
+
+### [ISSUE-036] Hardcoded Zero Distance Offset (+0m) & Static Speed/Offset in Convoy Roster
+- **Date & Phase**: 2026-09-20 | Multi-Rider Telemetry & HUD Accuracy
+- **Component / Command**: `IotTelemetryService`, `TelemetryPacket`, `ConvoyPeer`, `ConvoyMarkerWidget`, `PackNotifier`
+- **Symptom / Error Message**:
+  1. Device screenshots revealed both the Leader and Follower markers displayed `+0m` on the radar map despite being physically separated by hundreds of meters.
+  2. The self marker displayed `faizan (You): +0m`, creating a confusing self-relative 0-meter offset tag.
+  3. In the Convoy Roster screen, all member tiles showed static speeds (`0 km/h`) and static descriptions (`Road Captain`, `Pack Rider`), ignoring live GPS movements.
+- **Root Cause Analysis**:
+  1. `IotTelemetryService` instantiated `ConvoyPeer` with hardcoded `relativeOffsetMeters: 0` for both incoming packets and local GPS updates.
+  2. `TelemetryPacket` omitted the `isLeader` field in `toJson()`, so remote riders were never marked as `isLeader` in telemetry peers.
+  3. `ConvoyMarkerWidget` unconditionally appended `offsetFormatted` to `peer.callsign` for self, rendering `faizan (You): +0m`.
+  4. `PackNotifier` did not listen to `_telemetryService.convoyStream`, leaving `PackFormation.members` disconnected from live speed and distance updates.
+- **Fix / Solution Applied**:
+  1. Added `isLeader` to `TelemetryPacket` serialization and deserialization.
+  2. Implemented dynamic geodesic distance and bearing-relative signed offset calculations in `IotTelemetryService._emitPeers()` using `package:latlong2/latlong.dart`. Peers ahead are formatted with `+` (e.g. `+350m`, `+1.2km`), peers behind with `-` (e.g. `-120m`), and within 15m as `With Pack`.
+  3. Updated `ConvoyMarkerWidget` to display a clean `LEAD` badge or callsign for self, while reserving signed distance badges for remote peers.
+  4. Subscribed `PackNotifier` to the live telemetry stream (`_listenToTelemetryForRoster()`) to dynamically update each member's speed and relative distance offset in real-time.
+- **Verification**:
+  - `flutter analyze` &rarr; No issues found (ran in 3.6s).
+  - Built debug APK and installed on physical device.
+- **Prevention Rule**:
+  Never hardcode relative spatial or telemetry properties in real-time domain models. Ensure all pub/sub packets serialize the complete required semantic metadata (`isLeader`, speed, heading, altitude).

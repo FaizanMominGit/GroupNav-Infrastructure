@@ -53,8 +53,24 @@ class ConvoyMarkerWidget extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 4),
-              Text(peer.offsetFormatted, style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
+              if (peer.isLeader) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'LEAD',
+                    style: AppTypography.labelSm.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 8.5,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -126,13 +142,27 @@ class ConvoyMarkerWidget extends StatelessWidget {
             children: [
               Flexible(
                 child: Text(
-                  '${peer.callsign}:',
+                  peer.callsign,
                   style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 3),
-              Text(peer.offsetFormatted, style: AppTypography.labelSm.copyWith(color: badgeColor, fontWeight: FontWeight.w700)),
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: (peer.isLeader ? AppColors.alertWarning : badgeColor).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  peer.offsetFormatted,
+                  style: AppTypography.labelSm.copyWith(
+                    color: peer.isLeader ? AppColors.alertWarning : badgeColor,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 9,
+                  ),
+                ),
+              ),
             ],
           ),
         ),

@@ -8,6 +8,7 @@ class TelemetryPacket {
   final double speedKmh;
   final double headingDeg;
   final double accuracy;
+  final bool isLeader;
   final int timestamp;
 
   const TelemetryPacket({
@@ -20,6 +21,7 @@ class TelemetryPacket {
     required this.speedKmh,
     required this.headingDeg,
     this.accuracy = 4.5,
+    this.isLeader = false,
     required this.timestamp,
   });
 
@@ -33,6 +35,7 @@ class TelemetryPacket {
     'speedKmh': speedKmh,
     'headingDeg': headingDeg,
     'accuracy': accuracy,
+    'isLeader': isLeader,
     'timestamp': timestamp,
   };
 
@@ -47,6 +50,7 @@ class TelemetryPacket {
       speedKmh: (json['speedKmh'] as num?)?.toDouble() ?? 0.0,
       headingDeg: (json['headingDeg'] as num?)?.toDouble() ?? 0.0,
       accuracy: (json['accuracy'] as num?)?.toDouble() ?? 4.5,
+      isLeader: json['isLeader'] as bool? ?? false,
       timestamp: json['timestamp'] as int? ?? DateTime.now().millisecondsSinceEpoch,
     );
   }

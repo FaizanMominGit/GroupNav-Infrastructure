@@ -461,13 +461,16 @@ class _LiveRadarScreenState extends ConsumerState<LiveRadarScreen> {
                         children: [
                           Row(
                             children: [
-                              Text(
-                                isLeader ? 'ACTIVE ROUTE • ROAD CAPTAIN' : 'ACTIVE ROUTE • LOCKED',
-                                style: AppTypography.labelSm.copyWith(
-                                  fontSize: 8.5,
-                                  color: isLeader ? AppColors.primary : AppColors.textSecondary,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.5,
+                              Flexible(
+                                child: Text(
+                                  isLeader ? 'ROUTE • ROAD CAPTAIN' : 'ROUTE • LOCKED',
+                                  style: AppTypography.labelSm.copyWith(
+                                    fontSize: 8.5,
+                                    color: isLeader ? AppColors.primary : AppColors.textSecondary,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.5,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               if (isLeader) ...[

@@ -36,14 +36,21 @@ From device screenshots taken during multi-rider testing:
     - At/Above 1,000m: Displays signed kilometers (e.g. `+1.8km`, `-2.4km`).
 - In `ConvoyMarkerWidget` (`mobile/lib/features/radar/widgets/convoy_marker_widget.dart`):
   - Self marker badge cleanly shows the user's callsign and an optional gold `LEAD` chip (if captain).
-  - Remote peer marker features a high-contrast pill badge with the formatted offset distance.
-
 #### D. Live Telemetry Subscription for Convoy Roster (`PackNotifier`)
 - Subscribed `PackNotifier` to `_telemetryService.convoyStream` via `_listenToTelemetryForRoster()`.
 - Maps incoming telemetry to each `PackMember` by callsign, dynamically updating:
   - `member.speedKmh`: Live GPS speed (e.g. `28 km/h`).
   - `member.offsetMeters`: Live relative distance.
   - `member.offsetDescription`: `Leading`, `+350m ahead`, `120m behind`, or `With Pack`.
+
+#### E. Narrow Viewport & Sub-Pixel Overflow Protection
+- **`TopAppBarPill` (`mobile/lib/core/widgets/top_app_bar_pill.dart`)**:
+  - Wrapped title text in `Flexible` with `TextOverflow.ellipsis` to gracefully adapt to narrower Android screen widths (e.g. A142 at 360-384dp).
+  - Compacted status badge sizing and spacing (`fontSize: 10.5`) to eliminate 52px RenderFlex overflows.
+- **`LiveRadarScreen` (`mobile/lib/features/radar/screens/live_radar_screen.dart`)**:
+  - Wrapped route status subtitle in `Flexible` to prevent 29px route name overflows.
+- **`AuthOnboardingScreen` (`mobile/lib/features/auth/screens/auth_onboarding_screen.dart`)**:
+  - Wrapped `Convoy Profile` heading in `Flexible` to eliminate 1.7px overflows in the rider configuration card.
 
 ---
 
@@ -56,8 +63,15 @@ From device screenshots taken during multi-rider testing:
 2. **Self Marker vs Peer Marker Distinction**:
    - Displaying `+0m` on the user's own avatar confuses riders into thinking tracking is broken. Differentiating self (`You`/`Lead`) from peers (`+350m`/`-120m`) matches industry standard avionics and rally navigation systems.
 
+3. **Defensive Flex Layout on Constrained Screens**:
+   - Different Android device models exhibit varying DPI scaling (Realme vs Nothing A142). Enforcing flexible child sizing on text headers ensures that status pills and badges never break across diverse screen widths.
+
 ---
 
 ## 3. Verification Evidence
 - `flutter analyze` &rarr; Zero issues found (`No issues found!`).
 - Clean debug APK assembly via `flutter build apk --debug`.
+- Fresh installation and verification on **A142 (`00080348O000854`)**:
+  - App launched cleanly into live navigation view.
+  - Active route header displays `ROUTE • LOCKED Coastal Marine Highwa... • 1 Live` with zero pixel overflows.
+  - Bottom telemetry sheet operational (`IoT MQTT • 3 pkts`, `SPEED 1 km/h`, `HEADING NW 336°`, `PACK STATUS SOLO`).

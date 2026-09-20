@@ -41,47 +41,49 @@ class TopAppBarPill extends StatelessWidget implements PreferredSizeWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.navigation, color: AppColors.primary, size: 16),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    title,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.headlineMd.copyWith(
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
-                      fontSize: 16,
-                    ),
-                  ),
-                  if (subtitle != null) ...[
-                    const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      width: 28,
+                      height: 28,
                       decoration: BoxDecoration(
-                        color: AppColors.primaryFixed.withValues(alpha: 0.5),
-                        borderRadius: AppTheme.radiusSm,
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
                       ),
+                      child: const Icon(Icons.navigation, color: AppColors.primary, size: 16),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
                       child: Text(
-                        subtitle!,
-                        style: AppTypography.labelSm.copyWith(
-                          color: AppColors.primaryDark,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 9.5,
+                        title,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.headlineMd.copyWith(
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.5,
+                          fontSize: 16,
                         ),
                       ),
                     ),
+                    if (subtitle != null) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryFixed.withValues(alpha: 0.5),
+                          borderRadius: AppTheme.radiusSm,
+                        ),
+                        child: Text(
+                          subtitle!,
+                          style: AppTypography.labelSm.copyWith(
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 9.5,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
+              const SizedBox(width: 8),
 
               // Right: AWS Cloud Status Pill
               Container(

@@ -521,21 +521,30 @@ class _AuthOnboardingScreenState extends ConsumerState<AuthOnboardingScreen> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          width: 26,
-                                          height: 26,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary.withValues(alpha: 0.1),
-                                            shape: BoxShape.circle,
+                                    Flexible(
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary.withValues(alpha: 0.1),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(Icons.motorcycle, size: 15, color: AppColors.primary),
                                           ),
-                                          child: const Icon(Icons.motorcycle, size: 15, color: AppColors.primary),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text('Convoy Profile', style: AppTypography.labelLg),
-                                      ],
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: Text(
+                                              'Convoy Profile',
+                                              style: AppTypography.labelLg,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
+                                    const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(

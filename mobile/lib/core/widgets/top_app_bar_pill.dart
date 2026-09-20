@@ -37,9 +37,10 @@ class TopAppBarPill extends StatelessWidget implements PreferredSizeWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               // Left: Brand Moniker
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                   Container(
                     width: 28,
                     height: 28,
@@ -79,7 +80,8 @@ class TopAppBarPill extends StatelessWidget implements PreferredSizeWidget {
                   ],
                 ],
               ),
-              const SizedBox(width: 8),
+            ),
+            const SizedBox(width: 8),
 
               // Right: AWS Cloud Status Pill
               Container(
